@@ -22,33 +22,61 @@ public final class RcloneCommand {
     }
 
     public static List<String> build(SettingRclone settings, String appRoot, Path source, long chatId, long messageId) {
+        String fileName = source == null || source.getFileName() == null ? null : source.getFileName().toString();
+        return build(settings, appRoot, source, new RclonePaths.Values(0, null, null, chatId, null, messageId, null, fileName, null));
+    }
+
+    public static List<String> build(SettingRclone settings, String appRoot, Path source, RclonePaths.Values values) {
         if (settings == null || StrUtil.isBlank(settings.remote)) {
             throw new IllegalArgumentException("rclone remote is empty");
         }
         if (source == null || source.getFileName() == null) {
             throw new IllegalArgumentException("local file is missing");
         }
+        String fileName = sanitizeFileName(source.getFileName().toString());
+        RclonePaths.Values named = new RclonePaths.Values(
+                values.accountId(),
+                values.accountName(),
+                values.accountUsername(),
+                values.chatId(),
+                values.chatTitle(),
+                values.messageId(),
+                values.type(),
+                fileName,
+                values.completionEpochMs());
         List<String> command = new ArrayList<>();
         command.add("rclone");
         command.add(settings.move() ? "moveto" : "copyto");
         command.add("--config");
         command.add(settings.resolvedConfigPath(appRoot));
         command.add(source.toString());
-        command.add(destination(settings.remote, chatId, messageId, source.getFileName().toString()));
+        command.add(destination(settings, named));
         command.addAll(parseFlags(settings.extraFlags));
         return command;
     }
 
+    public static String destination(SettingRclone settings, RclonePaths.Values values) {
+        if (settings == null || StrUtil.isBlank(settings.remote)) {
+            throw new IllegalArgumentException("rclone remote is empty");
+        }
+        return joinRemote(settings.remote, RclonePaths.render(settings.pathTemplate, RclonePaths.resolveZone(settings.timeZone), values));
+    }
+
     public static String destination(String remote, long chatId, long messageId, String fileName) {
+        SettingRclone settings = SettingRclone.defaults();
+        settings.remote = remote;
+        return destination(settings, new RclonePaths.Values(0, null, null, chatId, null, messageId, null, fileName, null));
+    }
+
+    public static String joinRemote(String remote, String relative) {
         String base = remote == null ? "" : remote.trim();
         if (base.isEmpty()) {
             throw new IllegalArgumentException("rclone remote is empty");
         }
-        String name = sanitizeFileName(fileName);
         if (!base.endsWith("/") && !base.endsWith(":")) {
             base = base + "/";
         }
-        return base + chatId + "/" + messageId + "/" + name;
+        return base + relative;
     }
 
     public static String sanitizeFileName(String fileName) {

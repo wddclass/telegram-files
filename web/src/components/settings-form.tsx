@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import React, { type FormEvent } from "react";
+import React, { type FormEvent, useEffect, useState } from "react";
 import { useSettings } from "@/hooks/use-settings";
 import { useTelegramAccount } from "@/hooks/use-telegram-account";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
@@ -18,6 +18,7 @@ import { DialogClose, DialogFooter } from "@/components/ui/dialog";
 import TimeRangeSelector from "@/components/ui/time-range-selector";
 import { Switch } from "@/components/ui/switch";
 import { type SettingKey } from "@/lib/types";
+import { request } from "@/lib/api";
 
 type RcloneSettings = {
   enabled: boolean;
@@ -28,6 +29,8 @@ type RcloneSettings = {
   mode: "immediate" | "scheduled";
   schedule: string;
   fileTypes: string;
+  pathTemplate: string;
+  timeZone: string;
 };
 
 const DEFAULT_RCLONE: RcloneSettings = {
@@ -39,6 +42,8 @@ const DEFAULT_RCLONE: RcloneSettings = {
   mode: "immediate",
   schedule: "3600",
   fileTypes: "video",
+  pathTemplate: "{chatId}/{messageId}/{fileName}",
+  timeZone: "",
 };
 
 const RCLONE_FILE_TYPES = ["video", "photo", "audio", "file"] as const;
@@ -71,6 +76,35 @@ export default function SettingsForm() {
   ];
 
   const rclone = parseRclone(settings?.rclone);
+  const [pathPreview, setPathPreview] = useState<{
+    destination?: string;
+    error?: string;
+    timeZone?: string;
+    accountName?: string;
+    accountUsername?: string;
+    usingAccount?: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      void request("/settings/rclone-path-preview", {
+        method: "POST",
+        body: JSON.stringify({
+          remote: rclone.remote,
+          pathTemplate: rclone.pathTemplate,
+          timeZone: rclone.timeZone,
+          telegramId: account?.id ?? "",
+        }),
+      })
+        .then((result) => setPathPreview(result))
+        .catch((error: unknown) =>
+          setPathPreview({
+            error: error instanceof Error ? error.message : "Preview failed",
+          }),
+        );
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [account?.id, rclone.remote, rclone.pathTemplate, rclone.timeZone]);
 
   const updateRclone = (patch: Partial<RcloneSettings>) => {
     void setSetting("rclone", JSON.stringify({ ...rclone, ...patch }));
@@ -309,9 +343,69 @@ export default function SettingsForm() {
               onChange={(event) => updateRclone({ remote: event.target.value })}
             />
             <p className="text-xs text-muted-foreground">
-              Destination remote, for example <code>gdrive:telegram</code>.
-              Files are stored under{" "}
+              Destination remote, for example <code>googledrive:WC/CC</code>.
+              The path under it comes from the template below.
+            </p>
+          </div>
+          <div className="flex flex-col space-y-2">
+            <Label htmlFor="rclone-template">Path template</Label>
+            <Input
+              id="rclone-template"
+              value={rclone.pathTemplate}
+              placeholder="{chatId}/{messageId}/{fileName}"
+              onChange={(event) =>
+                updateRclone({ pathTemplate: event.target.value })
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Placeholders: <code>{"{date:yyyyMMdd}"}</code>,{" "}
+              <code>{"{date:yyyy-MM-dd}"}</code>, <code>{"{accountName}"}</code>,{" "}
+              <code>{"{accountUsername}"}</code>, <code>{"{accountId}"}</code>,{" "}
+              <code>{"{chatTitle}"}</code>, <code>{"{chatId}"}</code>,{" "}
+              <code>{"{messageId}"}</code>, <code>{"{type}"}</code>,{" "}
+              <code>{"{fileName}"}</code>. Date uses the download completion
+              time. The default keeps{" "}
               <code>remote/chatId/messageId/fileName</code>.
+            </p>
+          </div>
+          <div className="flex flex-col space-y-2">
+            <Label htmlFor="rclone-timezone">Date timezone</Label>
+            <Input
+              id="rclone-timezone"
+              value={rclone.timeZone}
+              placeholder="Asia/Shanghai"
+              onChange={(event) =>
+                updateRclone({ timeZone: event.target.value })
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              IANA zone id. Leave empty to use the container <code>TZ</code>{" "}
+              variable, or Asia/Shanghai when <code>TZ</code> is unset.
+            </p>
+          </div>
+          <div className="rounded-md bg-gray-50 p-2 text-xs dark:bg-gray-700">
+            <p className="text-muted-foreground">Preview</p>
+            {pathPreview?.error ? (
+              <p className="mt-1 break-all text-red-600">{pathPreview.error}</p>
+            ) : (
+              <p className="mt-1 break-all font-mono">
+                {pathPreview?.destination ?? "…"}
+              </p>
+            )}
+            <p className="mt-1 text-muted-foreground">
+              {pathPreview?.usingAccount
+                ? `Account ${pathPreview.accountName || pathPreview.accountUsername}${
+                    pathPreview.accountUsername &&
+                    pathPreview.accountUsername !== String(account?.id)
+                      ? ` (@${pathPreview.accountUsername})`
+                      : ""
+                  }. `
+                : "No account selected, so the preview uses a sample name. "}
+              Chat and file name are samples. Time zone{" "}
+              {pathPreview?.timeZone ?? "…"}. Styled letters in the account
+              name are kept. If two files render the same path, rclone writes
+              that exact name: an identical remote file is skipped, and a
+              different file replaces it.
             </p>
           </div>
           <div className="flex flex-col space-y-2">

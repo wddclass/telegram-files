@@ -22,6 +22,10 @@ public class SettingRclone {
     public String mode;
     public String schedule;
     public String fileTypes;
+    /** Relative path under {@link #remote}. Blank keeps {@code {chatId}/{messageId}/{fileName}}. */
+    public String pathTemplate;
+    /** IANA zone id. Blank uses the TZ environment variable, then Asia/Shanghai. */
+    public String timeZone;
 
     public static SettingRclone defaults() {
         SettingRclone settings = new SettingRclone();
@@ -33,6 +37,8 @@ public class SettingRclone {
         settings.mode = "immediate";
         settings.schedule = "3600";
         settings.fileTypes = "video";
+        settings.pathTemplate = telegram.files.RclonePaths.DEFAULT_TEMPLATE;
+        settings.timeZone = "";
         return settings;
     }
 
@@ -66,6 +72,12 @@ public class SettingRclone {
         }
         if (parsed.extraFlags == null) {
             parsed.extraFlags = "";
+        }
+        if (StrUtil.isBlank(parsed.pathTemplate)) {
+            parsed.pathTemplate = defaults.pathTemplate;
+        }
+        if (parsed.timeZone == null) {
+            parsed.timeZone = "";
         }
         return parsed;
     }

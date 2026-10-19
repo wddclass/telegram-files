@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import telegram.files.repository.SettingRclone;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -67,5 +68,64 @@ public class RcloneCommandTest {
         assertFalse(RcloneCommand.isDue("0 */6 * * *", dueMs, due.plusSeconds(20).toInstant().toEpochMilli()));
         assertFalse(RcloneCommand.isDue("0 */6 * * *", 0, due.withMinute(15).toInstant().toEpochMilli()));
         assertFalse(RcloneCommand.isDue("not a schedule", 0, dueMs));
+    }
+
+    @Test
+    void blankTemplateAndOldSettingsKeepTheCurrentLayout() {
+        SettingRclone parsed = SettingRclone.fromJson("{\"enabled\":true,\"remote\":\"gdrive:telegram\"}");
+        assertEquals(RclonePaths.DEFAULT_TEMPLATE, parsed.pathTemplate);
+        assertEquals("", parsed.timeZone);
+        assertEquals("gdrive:telegram/5/9/clip.mp4",
+                RcloneCommand.destination("gdrive:telegram", 5, 9, "clip.mp4"));
+    }
+
+    @Test
+    void pathTemplateUsesCompletionDateAccountNameAndUsername() {
+        long completion = Instant.parse("2026-10-19T16:30:00Z").toEpochMilli();
+        RclonePaths.Values values = new RclonePaths.Values(
+                4242,
+                "𝘄𝗱𝗱𝘇𝘇𝘇",
+                "@wdd_user",
+                -1001,
+                "News/Room",
+                99,
+                "video",
+                "clip.mp4",
+                completion);
+        ZoneId shanghai = ZoneId.of("Asia/Shanghai");
+        assertEquals("𝘄𝗱𝗱𝘇𝘇𝘇-20261020/clip.mp4",
+                RclonePaths.render("{accountName}-{date:yyyyMMdd}/{fileName}", shanghai, values));
+        assertEquals("2026-10-19",
+                RclonePaths.render("{date:yyyy-MM-dd}", ZoneId.of("UTC"), values));
+        assertEquals("2026/10/20/clip.mp4",
+                RclonePaths.render("{date:yyyy/MM/dd}/{fileName}", shanghai, values));
+        assertEquals("News_Room", RclonePaths.render("{chatTitle}", shanghai, values));
+        assertEquals("wdd_user", RclonePaths.render("{accountUsername}", shanghai, values));
+        assertEquals("4242", RclonePaths.render("{accountUsername}", shanghai,
+                new RclonePaths.Values(4242, "𝘄𝗱𝗱𝘇𝘇𝘇", null, 1, null, 1, "video", "a.mp4", completion)));
+        assertTrue(RclonePaths.render("{accountName}", shanghai, values).contains("𝘄"));
+
+        SettingRclone settings = SettingRclone.defaults();
+        settings.remote = "googledrive:WC/CC";
+        settings.pathTemplate = "{accountName}-{date:yyyyMMdd}/{fileName}";
+        settings.timeZone = "Asia/Shanghai";
+        String destination = RcloneCommand.destination(settings, values);
+        assertEquals("googledrive:WC/CC/𝘄𝗱𝗱𝘇𝘇𝘇-20261020/clip.mp4", destination);
+        RclonePaths.Values sameName = new RclonePaths.Values(
+                7, "𝘄𝗱𝗱𝘇𝘇𝘇", "other", 8, "Other", 100, "video", "clip.mp4", completion);
+        assertEquals(destination, RcloneCommand.destination(settings, sameName));
+    }
+
+    @Test
+    void pathTemplateRejectsUnsafeSegmentsAndBadPatterns() {
+        RclonePaths.Values values = new RclonePaths.Values(1, "A/B:C", "ok", 2, null, 3, "video", "clip.mp4", 0L);
+        assertEquals("A_B_C", RclonePaths.sanitizeSegment("A/B:C"));
+        assertEquals("A_B_C", RclonePaths.render("{accountName}", ZoneId.of("UTC"), values));
+        assertThrows(IllegalArgumentException.class,
+                () -> RclonePaths.render("../{fileName}", ZoneId.of("UTC"), values));
+        assertThrows(IllegalArgumentException.class,
+                () -> RclonePaths.render("{date:}", ZoneId.of("UTC"), values));
+        assertThrows(IllegalArgumentException.class, () -> RclonePaths.resolveZone("Not/AZone"));
+        assertEquals(ZoneId.of("UTC"), RclonePaths.resolveZone("UTC"));
     }
 }
