@@ -70,6 +70,8 @@ public class DataVerticleMigrationTest {
                                         .collect(Collectors.toSet());
                                 Assertions.assertTrue(columnNames.contains("start_date"));
                                 Assertions.assertTrue(columnNames.contains("completion_date"));
+                                Assertions.assertTrue(columnNames.contains("rclone_status"));
+                                Assertions.assertTrue(columnNames.contains("rclone_error"));
                             });
                             return conn.close();
                         }))
@@ -95,6 +97,8 @@ public class DataVerticleMigrationTest {
                                         .collect(Collectors.toSet());
                                 Assertions.assertTrue(columnNames.contains("start_date"));
                                 Assertions.assertTrue(columnNames.contains("completion_date"));
+                                Assertions.assertTrue(columnNames.contains("rclone_status"));
+                                Assertions.assertTrue(columnNames.contains("rclone_error"));
                             });
                             return conn.close();
                         }))

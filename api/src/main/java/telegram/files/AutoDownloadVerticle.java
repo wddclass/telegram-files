@@ -258,6 +258,12 @@ public class AutoDownloadVerticle extends AbstractVerticle {
             callback.accept(new ScanResult(nextFileType, nextFromMessageId, false));
             return;
         }
+        foundChatMessages.messages = Future.await(FileRecordRetriever.expandAlbums(
+                        telegramId, foundChatMessages.messages, searchChatMessages.filter)
+                .recover(err -> {
+                    log.warn("Expand albums during auto download failed: %s".formatted(err.getMessage()));
+                    return Future.succeededFuture(foundChatMessages.messages);
+                }));
         if (foundChatMessages.messages.length == 0) {
             List<String> fileTypes = rule.v2;
             int nextTypeIndex = fileTypes.indexOf(nextFileType) + 1;
@@ -434,7 +440,8 @@ public class AutoDownloadVerticle extends AbstractVerticle {
                 .ifPresent(telegramVerticle -> {
                     if (telegramVerticle.authorized) {
                         telegramVerticle.client.execute(new TdApi.GetMessage(chatId, messageId))
-                                .onSuccess(message -> addWaitingDownloadMessages(telegramId, List.of(message), true, false))
+                                .compose(message -> FileRecordRetriever.getAlbumMessages(telegramId, message))
+                                .onSuccess(messages -> addWaitingDownloadMessages(telegramId, Arrays.asList(messages), true, false))
                                 .onFailure(e -> log.error("Auto download fail. Get message failed: %s".formatted(e.getMessage())));
                     }
                 });

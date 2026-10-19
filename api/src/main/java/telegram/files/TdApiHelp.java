@@ -29,7 +29,8 @@ public class TdApiHelp {
             TdApi.MessagePhoto.CONSTRUCTOR,
             TdApi.MessageVideo.CONSTRUCTOR,
             TdApi.MessageAudio.CONSTRUCTOR,
-            TdApi.MessageDocument.CONSTRUCTOR
+            TdApi.MessageDocument.CONSTRUCTOR,
+            TdApi.MessagePaidMedia.CONSTRUCTOR
     );
 
     private static final TypeConverter TD_API_TYPE_CONVERTER = (targetType, value) -> {
@@ -137,8 +138,8 @@ public class TdApiHelp {
             return new ArrayList<>();
         }
         return messages.stream()
-                .filter(message -> FILE_CONTENT_CONSTRUCTORS.contains(message.content.getConstructor()))
-                .map(TdApiHelp::getFileId)
+                .flatMap(message -> getFileHandlers(message).stream())
+                .map(FileHandler::getFileId)
                 .filter(Objects::nonNull)
                 .toList();
     }
@@ -148,8 +149,8 @@ public class TdApiHelp {
             return new ArrayList<>();
         }
         return messages.stream()
-                .filter(message -> FILE_CONTENT_CONSTRUCTORS.contains(message.content.getConstructor()))
-                .map(TdApiHelp::getFileUniqueId)
+                .flatMap(message -> getFileHandlers(message).stream())
+                .map(FileHandler::getFileUniqueId)
                 .filter(Objects::nonNull)
                 .toList();
     }
@@ -195,24 +196,55 @@ public class TdApiHelp {
     }
 
     public static <T extends FileHandler<? extends TdApi.MessageContent>> Optional<T> getFileHandler(TdApi.Message message) {
-        if (message == null) return Optional.empty();
-        switch (message.content.getConstructor()) {
-            case TdApi.MessagePhoto.CONSTRUCTOR -> {
-                return Optional.of((T) new PhotoHandler(message));
+        List<FileHandler<?>> handlers = getFileHandlers(message);
+        if (handlers.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of((T) handlers.getFirst());
+    }
+
+    /**
+     * Every downloadable file attached to the message. A normal photo or video is one file.
+     * Paid media (and any future multi-attachment content) yields one handler per photo or video,
+     * so a single post is not collapsed to its first item.
+     */
+    public static List<FileHandler<?>> getFileHandlers(TdApi.Message message) {
+        if (message == null || message.content == null) {
+            return List.of();
+        }
+        return switch (message.content.getConstructor()) {
+            case TdApi.MessagePhoto.CONSTRUCTOR -> List.of(new PhotoHandler(message));
+            case TdApi.MessageVideo.CONSTRUCTOR -> List.of(new VideoHandler(message));
+            case TdApi.MessageAudio.CONSTRUCTOR -> List.of(new AudioHandler(message));
+            case TdApi.MessageDocument.CONSTRUCTOR -> List.of(new DocumentHandler(message));
+            case TdApi.MessagePaidMedia.CONSTRUCTOR -> paidMediaHandlers(message);
+            default -> List.of();
+        };
+    }
+
+    private static List<FileHandler<?>> paidMediaHandlers(TdApi.Message message) {
+        TdApi.MessagePaidMedia content = (TdApi.MessagePaidMedia) message.content;
+        if (content.media == null || content.media.length == 0) {
+            return List.of();
+        }
+        List<FileHandler<?>> handlers = new ArrayList<>();
+        for (TdApi.PaidMedia media : content.media) {
+            if (media == null) {
+                continue;
             }
-            case TdApi.MessageVideo.CONSTRUCTOR -> {
-                return Optional.of((T) new VideoHandler(message));
-            }
-            case TdApi.MessageAudio.CONSTRUCTOR -> {
-                return Optional.of((T) new AudioHandler(message));
-            }
-            case TdApi.MessageDocument.CONSTRUCTOR -> {
-                return Optional.of((T) new DocumentHandler(message));
-            }
-            default -> {
-                return Optional.empty();
+            if (media.getConstructor() == TdApi.PaidMediaPhoto.CONSTRUCTOR) {
+                TdApi.PaidMediaPhoto photo = (TdApi.PaidMediaPhoto) media;
+                if (photo.photo != null && photo.photo.sizes != null && photo.photo.sizes.length > 0) {
+                    handlers.add(new PaidPhotoHandler(message, photo.photo));
+                }
+            } else if (media.getConstructor() == TdApi.PaidMediaVideo.CONSTRUCTOR) {
+                TdApi.PaidMediaVideo video = (TdApi.PaidMediaVideo) media;
+                if (video.video != null && video.video.video != null) {
+                    handlers.add(new PaidVideoHandler(message, video.video));
+                }
             }
         }
+        return handlers;
     }
 
     public static abstract class FileHandler<T extends TdApi.MessageContent> {
@@ -297,7 +329,9 @@ public class TdApiHelp {
                     null,
                     0L,
                     0L,
-                    0L
+                    0L,
+                    null,
+                    null
             );
         }
     }
@@ -347,7 +381,9 @@ public class TdApiHelp {
                     null,
                     0L,
                     0L,
-                    getReactionCount()
+                    getReactionCount(),
+                    null,
+                    null
             );
         }
 
@@ -441,7 +477,9 @@ public class TdApiHelp {
                     null,
                     0L,
                     0L,
-                    getReactionCount()
+                    getReactionCount(),
+                    null,
+                    null
             );
         }
 
@@ -510,7 +548,9 @@ public class TdApiHelp {
                     null,
                     0L,
                     0L,
-                    getReactionCount()
+                    getReactionCount(),
+                    null,
+                    null
             );
         }
 
@@ -574,7 +614,9 @@ public class TdApiHelp {
                     null,
                     0L,
                     0L,
-                    getReactionCount()
+                    getReactionCount(),
+                    null,
+                    null
             );
         }
 
@@ -587,6 +629,170 @@ public class TdApiHelp {
         public TdApi.Thumbnail getThumbnail() {
             return content.document.thumbnail;
         }
+    }
+
+    public static class PaidPhotoHandler extends FileHandler<TdApi.MessagePaidMedia> {
+        private final TdApi.Photo photo;
+
+        public PaidPhotoHandler(TdApi.Message message, TdApi.Photo photo) {
+            super(message);
+            this.photo = photo;
+        }
+
+        private TdApi.PhotoSize fullSize() {
+            return photo.sizes[photo.sizes.length - 1];
+        }
+
+        @Override
+        public Integer getFileId() {
+            return fullSize().photo.id;
+        }
+
+        @Override
+        public String getFileUniqueId() {
+            return fullSize().photo.remote.uniqueId;
+        }
+
+        @Override
+        public FileRecord convertFileRecord(long telegramId) {
+            TdApi.File file = getFile();
+            return new FileRecord(
+                    getFileId(),
+                    file.remote.uniqueId,
+                    telegramId,
+                    message.chatId,
+                    message.id,
+                    message.mediaAlbumId,
+                    message.date,
+                    message.restrictionInfo != null && message.restrictionInfo.hasSensitiveContent,
+                    file.size == 0 ? file.expectedSize : file.size,
+                    file.local == null ? 0 : file.local.downloadedSize,
+                    "photo",
+                    null,
+                    null,
+                    Base64.encode((byte[]) BeanUtil.getProperty(photo, "minithumbnail.data")),
+                    getThumbnailFileUniqueId(),
+                    captionText(content.caption),
+                    Json.encode(getExtraInfo()),
+                    null,
+                    "idle",
+                    "idle",
+                    System.currentTimeMillis(),
+                    null,
+                    null,
+                    0L,
+                    0L,
+                    getReactionCount(),
+                    null,
+                    null
+            );
+        }
+
+        @Override
+        public TdApi.File getFile() {
+            return fullSize().photo;
+        }
+
+        @Override
+        public JsonObject getExtraInfo() {
+            TdApi.PhotoSize size = fullSize();
+            return JsonObject.of("width", size.width, "height", size.height, "type", size.type);
+        }
+
+        @Override
+        public TdApi.Thumbnail getThumbnail() {
+            TdApi.PhotoSize full = fullSize();
+            TdApi.PhotoSize preview = null;
+            for (TdApi.PhotoSize size : photo.sizes) {
+                if ("m".equals(size.type)) {
+                    preview = size;
+                    break;
+                }
+            }
+            if (preview == null) {
+                preview = photo.sizes[0];
+            }
+            if (preview.photo.remote.uniqueId.equals(full.photo.remote.uniqueId)) {
+                return null;
+            }
+            return new TdApi.Thumbnail(new TdApi.ThumbnailFormatJpeg(), preview.width, preview.height, preview.photo);
+        }
+    }
+
+    public static class PaidVideoHandler extends FileHandler<TdApi.MessagePaidMedia> {
+        private final TdApi.Video video;
+
+        public PaidVideoHandler(TdApi.Message message, TdApi.Video video) {
+            super(message);
+            this.video = video;
+        }
+
+        @Override
+        public Integer getFileId() {
+            return video.video.id;
+        }
+
+        @Override
+        public String getFileUniqueId() {
+            return video.video.remote.uniqueId;
+        }
+
+        @Override
+        public FileRecord convertFileRecord(long telegramId) {
+            TdApi.File file = getFile();
+            return new FileRecord(
+                    file.id,
+                    file.remote.uniqueId,
+                    telegramId,
+                    message.chatId,
+                    message.id,
+                    message.mediaAlbumId,
+                    message.date,
+                    message.restrictionInfo != null && message.restrictionInfo.hasSensitiveContent,
+                    file.size == 0 ? file.expectedSize : file.size,
+                    file.local == null ? 0 : file.local.downloadedSize,
+                    "video",
+                    video.mimeType,
+                    video.fileName,
+                    Base64.encode((byte[]) BeanUtil.getProperty(video, "minithumbnail.data")),
+                    getThumbnailFileUniqueId(),
+                    captionText(content.caption),
+                    Json.encode(getExtraInfo()),
+                    null,
+                    "idle",
+                    "idle",
+                    System.currentTimeMillis(),
+                    null,
+                    null,
+                    0L,
+                    0L,
+                    getReactionCount(),
+                    null,
+                    null
+            );
+        }
+
+        @Override
+        public TdApi.File getFile() {
+            return video.video;
+        }
+
+        @Override
+        public JsonObject getExtraInfo() {
+            return JsonObject.of("width", video.width,
+                    "height", video.height,
+                    "duration", video.duration,
+                    "mimeType", video.mimeType);
+        }
+
+        @Override
+        public TdApi.Thumbnail getThumbnail() {
+            return video.thumbnail;
+        }
+    }
+
+    private static String captionText(TdApi.FormattedText caption) {
+        return caption == null || caption.text == null ? "" : caption.text;
     }
 
     public static class ComparablePhotoSize implements Comparable<TdApi.PhotoSize> {

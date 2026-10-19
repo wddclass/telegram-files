@@ -30,8 +30,10 @@ import io.vertx.ext.web.sstore.LocalSessionStore;
 import io.vertx.ext.web.sstore.SessionStore;
 import org.drinkless.tdlib.TdApi;
 import org.jooq.lambda.function.Function2;
+import telegram.files.repository.FileRecord;
 import telegram.files.repository.SettingAutoRecords;
 import telegram.files.repository.SettingKey;
+import telegram.files.repository.SettingRclone;
 import telegram.files.repository.SettingRecord;
 
 import java.util.*;
@@ -63,6 +65,7 @@ public class HttpVerticle extends AbstractVerticle {
                 .compose(_ -> initAutoDownloadVerticle())
                 .compose(_ -> initTransferVerticle())
                 .compose(_ -> initPreloadMessageVerticle())
+                .compose(_ -> initRcloneVerticle())
                 .compose(_ -> initEventConsumer())
                 .onSuccess(startPromise::complete)
                 .onFailure(startPromise::fail);
@@ -172,6 +175,7 @@ public class HttpVerticle extends AbstractVerticle {
         router.post("/files/remove-multiple").handler(this::handleFileRemoveMultiple);
         router.post("/files/update-tags").handler(this::handleFileTagsUpdateMultiple);
         router.post("/file/:uniqueId/update-tags").handler(this::handleFileTagsUpdate);
+        router.post("/file/:uniqueId/rclone-retry").handler(this::handleRcloneRetry);
 
         router.route()
                 .failureHandler(ctx -> {
@@ -211,6 +215,11 @@ public class HttpVerticle extends AbstractVerticle {
 
     public Future<Void> initPreloadMessageVerticle() {
         return vertx.deployVerticle(new PreloadMessageVerticle(), Config.VIRTUAL_THREAD_DEPLOYMENT_OPTIONS)
+                .mapEmpty();
+    }
+
+    public Future<Void> initRcloneVerticle() {
+        return vertx.deployVerticle(new RcloneVerticle(), Config.VIRTUAL_THREAD_DEPLOYMENT_OPTIONS)
                 .mapEmpty();
     }
 
@@ -307,6 +316,35 @@ public class HttpVerticle extends AbstractVerticle {
                 .onFailure(ctx::fail);
     }
 
+    private void handleRcloneRetry(RoutingContext ctx) {
+        String uniqueId = ctx.pathParam("uniqueId");
+        if (StrUtil.isBlank(uniqueId)) {
+            ctx.fail(400);
+            return;
+        }
+        DataVerticle.fileRepository.updateRcloneStatus(uniqueId, FileRecord.RcloneStatus.pending.name(), null)
+                .compose(_ -> DataVerticle.fileRepository.getByUniqueId(uniqueId))
+                .onSuccess(record -> {
+                    if (record == null) {
+                        ctx.fail(404);
+                        return;
+                    }
+                    vertx.eventBus().publish(EventEnum.TELEGRAM_EVENT.address(), JsonObject.of(
+                            "telegramId", Long.toString(record.telegramId()),
+                            "payload", JsonObject.mapFrom(EventPayload.build(EventPayload.TYPE_FILE_STATUS, new JsonObject()
+                                    .put("fileId", record.id())
+                                    .put("uniqueId", record.uniqueId())
+                                    .put("localPath", record.localPath())
+                                    .put("rcloneStatus", FileRecord.RcloneStatus.pending.name())
+                                    .putNull("rcloneError")
+                            ))
+                    ));
+                    vertx.eventBus().publish(EventEnum.RCLONE_ENQUEUE.address(), uniqueId);
+                    ctx.json(new JsonObject().put("rcloneStatus", FileRecord.RcloneStatus.pending.name()));
+                })
+                .onFailure(ctx::fail);
+    }
+
     private void handleSettings(RoutingContext ctx) {
         String keysStr = ctx.request().getParam("keys");
         if (StrUtil.isBlank(keysStr)) {
@@ -325,7 +363,8 @@ public class HttpVerticle extends AbstractVerticle {
                         if (object.containsKey(key)) {
                             continue;
                         }
-                        object.put(key, SettingKey.valueOf(key).defaultValue);
+                        Object defaultValue = SettingKey.valueOf(key).defaultValue;
+                        object.put(key, defaultValue instanceof SettingRclone ? Json.encode(defaultValue) : defaultValue);
                     }
                     ctx.json(object);
                 })

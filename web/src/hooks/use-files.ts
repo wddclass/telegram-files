@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   type DownloadStatus,
   type FileFilter,
+  type RcloneStatus,
   type TelegramFile,
   type Thumbnail,
   type TransferStatus,
@@ -48,6 +49,8 @@ export function useFiles(
         completionDate?: number;
         downloadedSize: number;
         transferStatus?: TransferStatus;
+        rcloneStatus?: RcloneStatus | null;
+        rcloneError?: string | null;
         thumbnailFile?: Thumbnail;
         removed?: boolean;
       }
@@ -140,6 +143,8 @@ export function useFiles(
       completionDate: number;
       downloadedSize: number;
       transferStatus?: TransferStatus;
+      rcloneStatus?: RcloneStatus | null;
+      rcloneError?: string | null;
       thumbnailFile?: Thumbnail;
       removed?: boolean;
       type?: string;
@@ -179,6 +184,14 @@ export function useFiles(
           data.downloadedSize ?? prev[data.uniqueId]?.downloadedSize,
         transferStatus:
           data.transferStatus ?? prev[data.uniqueId]?.transferStatus,
+        rcloneStatus:
+          data.rcloneStatus !== undefined
+            ? data.rcloneStatus
+            : prev[data.uniqueId]?.rcloneStatus,
+        rcloneError:
+          data.rcloneError !== undefined
+            ? data.rcloneError
+            : prev[data.uniqueId]?.rcloneError,
         thumbnailFile: data.thumbnailFile ?? prev[data.uniqueId]?.thumbnailFile,
       },
     }));
@@ -196,10 +209,17 @@ export function useFiles(
   const files = useMemo(() => {
     if (!pages) return [];
     const files: TelegramFile[] = [];
+    const seen = new Set<string>();
     pages.forEach((page) => {
       page.files.forEach((file) => {
         if (file.originalDeleted && latestFilesStatus[file.uniqueId]?.removed) {
           return;
+        }
+        if (file.uniqueId && seen.has(file.uniqueId)) {
+          return;
+        }
+        if (file.uniqueId) {
+          seen.add(file.uniqueId);
         }
         files.push({
           ...file,
@@ -218,6 +238,10 @@ export function useFiles(
           transferStatus:
             latestFilesStatus[file.uniqueId]?.transferStatus ??
             file.transferStatus,
+          rcloneStatus:
+            latestFilesStatus[file.uniqueId]?.rcloneStatus ?? file.rcloneStatus,
+          rcloneError:
+            latestFilesStatus[file.uniqueId]?.rcloneError ?? file.rcloneError,
           thumbnailFile:
             latestFilesStatus[file.uniqueId]?.thumbnailFile ??
             file.thumbnailFile,
@@ -239,10 +263,16 @@ export function useFiles(
     let hasMore = false;
     if (lastPage) {
       const count = lastPage.count;
-      hasMore = count > fetchedCount && lastPage.nextFromMessageId !== 0;
+      if (filters.offline) {
+        hasMore = count > fetchedCount && lastPage.nextFromMessageId !== 0;
+      } else {
+        // Online pages can grow when a media album is expanded, so the file
+        // count is not a cursor. Keep paging until TDLib reports no next id.
+        hasMore = lastPage.nextFromMessageId !== 0;
+      }
     }
     return hasMore;
-  }, [pages]);
+  }, [filters.offline, pages]);
 
   const handleLoadMore = async () => {
     if (isLoading || isValidating || !hasMore || error) return;

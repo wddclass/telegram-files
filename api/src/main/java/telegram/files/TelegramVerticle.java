@@ -203,13 +203,19 @@ public class TelegramVerticle extends AbstractVerticle {
             searchChatMessages.filter = TdApiHelp.getSearchMessagesFilter(filter.get("type"));
             searchChatMessages.topicId = messageThreadId > 0 ? new TdApi.MessageTopicThread(messageThreadId) : null;
 
-            return (Objects.equals(filter.get("downloadStatus"), FileRecord.DownloadStatus.idle.name()) ?
-                    this.getIdleChatFiles(searchChatMessages, 0) :
-                    client.execute(searchChatMessages))
-                    .compose(t -> {
-                        preloadThumbnails(t);
-                        return TelegramConverter.convertFiles(this.telegramRecord.id(), t);
-                    });
+            Future<TdApi.FoundChatMessages> found = Objects.equals(filter.get("downloadStatus"), FileRecord.DownloadStatus.idle.name())
+                    ? this.getIdleChatFiles(searchChatMessages, 0)
+                    : client.execute(searchChatMessages)
+                    .compose(page -> FileRecordRetriever.expandAlbums(this.telegramRecord.id(), page.messages, searchChatMessages.filter)
+                            .map(expanded -> {
+                                page.messages = expanded;
+                                rememberAlbumFiles(expanded);
+                                return page;
+                            }));
+            return found.compose(t -> {
+                preloadThumbnails(t);
+                return TelegramConverter.convertFiles(this.telegramRecord.id(), t);
+            });
         }
     }
 
@@ -219,27 +225,53 @@ public class TelegramVerticle extends AbstractVerticle {
             searchChatMessages.limit = 100;
         }
         return client.execute(searchChatMessages)
-                .compose(foundChatMessages -> {
-                    TdApi.Message[] messages = Stream.of(foundChatMessages.messages)
-                            .filter(message ->
-                                    TdApiHelp.getFileHandler(message)
-                                            .map(TdApiHelp.FileHandler::getFile)
-                                            .map(file -> file.local == null || (
-                                                    !file.local.isDownloadingActive
-                                                    && !file.local.isDownloadingCompleted
-                                                    && file.local.downloadedSize == 0
-                                            ))
-                                            .orElse(false)
-                            )
-                            .toArray(TdApi.Message[]::new);
-                    if (ArrayUtil.isEmpty(messages) && foundChatMessages.nextFromMessageId != 0) {
-                        searchChatMessages.fromMessageId = foundChatMessages.nextFromMessageId;
-                        return getIdleChatFiles(searchChatMessages, seq + 1);
-                    } else {
-                        foundChatMessages.messages = messages;
-                        return Future.succeededFuture(foundChatMessages);
-                    }
-                });
+                .compose(foundChatMessages -> FileRecordRetriever.expandAlbums(
+                                this.telegramRecord.id(),
+                                foundChatMessages.messages,
+                                searchChatMessages.filter)
+                        .compose(expanded -> {
+                            TdApi.Message[] messages = Arrays.stream(expanded)
+                                    .filter(this::isIdleFileMessage)
+                                    .toArray(TdApi.Message[]::new);
+                            if (ArrayUtil.isEmpty(messages) && foundChatMessages.nextFromMessageId != 0) {
+                                searchChatMessages.fromMessageId = foundChatMessages.nextFromMessageId;
+                                return getIdleChatFiles(searchChatMessages, seq + 1);
+                            } else {
+                                foundChatMessages.messages = messages;
+                                rememberAlbumFiles(expanded);
+                                return Future.succeededFuture(foundChatMessages);
+                            }
+                        }));
+    }
+
+    /**
+     * Store every album member so the offline file list can show items that chat search omitted.
+     * Existing rows are left untouched.
+     */
+    private void rememberAlbumFiles(TdApi.Message[] messages) {
+        if (messages == null || telegramRecord == null) {
+            return;
+        }
+        for (TdApi.Message message : messages) {
+            if (!AlbumMessages.isAlbum(message)) {
+                continue;
+            }
+            for (TdApiHelp.FileHandler<?> handler : TdApiHelp.getFileHandlers(message)) {
+                DataVerticle.fileRepository.createIfNotExist(handler.convertFileRecord(telegramRecord.id()))
+                        .onFailure(err -> log.debug("[%s] Failed to remember album file %s: %s"
+                                .formatted(getRootId(), handler.getFileUniqueId(), err.getMessage())));
+            }
+        }
+    }
+
+    private boolean isIdleFileMessage(TdApi.Message message) {
+        return TdApiHelp.getFileHandlers(message).stream()
+                .map(TdApiHelp.FileHandler::getFile)
+                .anyMatch(file -> file != null && (file.local == null || (
+                        !file.local.isDownloadingActive
+                        && !file.local.isDownloadingCompleted
+                        && file.local.downloadedSize == 0
+                )));
     }
 
     public Future<JsonObject> getChatFilesCount(long chatId) {
@@ -276,13 +308,16 @@ public class TelegramVerticle extends AbstractVerticle {
                     }
                     return FileRecordRetriever.getAlbumMessages(this.telegramRecord.id(), messageLinkInfo.message);
                 })
-                .compose(messages -> TelegramConverter.convertFiles(this.telegramRecord.id(), messages)
-                        .map(files -> new JsonObject()
-                                .put("files", files)
-                                .put("count", files.size())
-                                .put("size", files.size())
-                                .put("nextFromMessageId", 0L) // No next message ID for link parsing
-                        ));
+                .compose(messages -> {
+                    rememberAlbumFiles(messages);
+                    return TelegramConverter.convertFiles(this.telegramRecord.id(), messages)
+                            .map(files -> new JsonObject()
+                                    .put("files", files)
+                                    .put("count", files.size())
+                                    .put("size", files.size())
+                                    .put("nextFromMessageId", 0L) // No next message ID for link parsing
+                            );
+                });
     }
 
     public Future<Tuple2<String, String>> loadPreview(String uniqueId) {
@@ -331,7 +366,11 @@ public class TelegramVerticle extends AbstractVerticle {
                         return Future.failedFuture("File is already downloading or completed");
                     }
 
-                    TdApiHelp.FileHandler<? extends TdApi.MessageContent> fileHandler = TdApiHelp.getFileHandler(message)
+                    TdApiHelp.FileHandler<? extends TdApi.MessageContent> fileHandler = TdApiHelp.getFileHandlers(message)
+                            .stream()
+                            .filter(handler -> Objects.equals(handler.getFileId(), file.id))
+                            .findFirst()
+                            .or(() -> TdApiHelp.getFileHandler(message))
                             .orElseThrow(() -> VertxException.noStackTrace("not support message type"));
                     FileRecord fileRecord = fileHandler.convertFileRecord(telegramRecord.id()).withThreadInfo(messageThreadInfo);
                     return DataVerticle.fileRepository.createIfNotExist(fileRecord)
@@ -1113,7 +1152,10 @@ public class TelegramVerticle extends AbstractVerticle {
                         return Future.failedFuture("File not found");
                     }
 
-                    fileRecord = TdApiHelp.getFileHandler(message)
+                    fileRecord = TdApiHelp.getFileHandlers(message).stream()
+                            .filter(handler -> Objects.equals(handler.getFileUniqueId(), file.remote.uniqueId))
+                            .findFirst()
+                            .or(() -> TdApiHelp.getFileHandler(message))
                             .orElseThrow(() -> VertxException.noStackTrace("not support message type"))
                             .convertFileRecord(telegramRecord.id())
                             .withThreadInfo(messageThreadInfo);

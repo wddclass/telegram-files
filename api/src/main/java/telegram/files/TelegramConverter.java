@@ -77,25 +77,30 @@ public class TelegramConverter {
                 .map(t -> {
                     Map<String, FileRecord> fileRecords = t.v1;
                     Map<String, FileRecord> thumbnails = t.v2;
-                    List<TdApi.Message> filterMessages = t.v3 ? TdApiHelp.filterUniqueMessages(messageList)
-                            : messageList;
-
-                    List<JsonObject> fileObjects = filterMessages.stream()
-                            .filter(message -> TdApiHelp.FILE_CONTENT_CONSTRUCTORS.contains(message.content.getConstructor()))
-                            .map(message -> {
-                                //TODO Processing of the same file under different accounts
-
-                                FileRecord fileRecord = fileRecords.get(TdApiHelp.getFileUniqueId(message));
-                                String thumbnailUniqueId = fileRecord != null && StrUtil.isNotBlank(fileRecord.thumbnailUniqueId())
-                                        ? fileRecord.thumbnailUniqueId()
-                                        : TdApiHelp.getFileHandler(message).map(handler -> handler.getThumbnailFileUniqueId()).orElse(null);
-                                return withSource(telegramId,
-                                        fileRecord,
-                                        StrUtil.isBlank(thumbnailUniqueId) ? null : thumbnails.get(thumbnailUniqueId),
-                                        message);
-                            })
-                            .filter(Objects::nonNull)
-                            .toList();
+                    boolean uniqueOnly = Boolean.TRUE.equals(t.v3);
+                    Set<Integer> seenFileIds = new HashSet<>();
+                    List<JsonObject> fileObjects = new ArrayList<>();
+                    for (TdApi.Message message : messageList) {
+                        for (TdApiHelp.FileHandler<?> handler : TdApiHelp.getFileHandlers(message)) {
+                            Integer fileId = handler.getFileId();
+                            if (uniqueOnly && fileId != null && !seenFileIds.add(fileId)) {
+                                continue;
+                            }
+                            //TODO Processing of the same file under different accounts
+                            FileRecord fileRecord = fileRecords.get(handler.getFileUniqueId());
+                            String thumbnailUniqueId = fileRecord != null && StrUtil.isNotBlank(fileRecord.thumbnailUniqueId())
+                                    ? fileRecord.thumbnailUniqueId()
+                                    : handler.getThumbnailFileUniqueId();
+                            JsonObject fileObject = withSource(telegramId,
+                                    fileRecord,
+                                    StrUtil.isBlank(thumbnailUniqueId) ? null : thumbnails.get(thumbnailUniqueId),
+                                    message,
+                                    handler);
+                            if (fileObject != null) {
+                                fileObjects.add(fileObject);
+                            }
+                        }
+                    }
                     return new JsonArray(fileObjects);
                 });
     }
@@ -150,8 +155,15 @@ public class TelegramConverter {
                                         FileRecord fileRecord,
                                         FileRecord thumbnailRecord,
                                         TdApi.Message message) {
-        TdApiHelp.FileHandler<? extends TdApi.MessageContent> fileHandler = TdApiHelp.getFileHandler(message)
-                .orElse(null);
+        return withSource(telegramId, fileRecord, thumbnailRecord, message,
+                TdApiHelp.getFileHandler(message).orElse(null));
+    }
+
+    public static JsonObject withSource(long telegramId,
+                                        FileRecord fileRecord,
+                                        FileRecord thumbnailRecord,
+                                        TdApi.Message message,
+                                        TdApiHelp.FileHandler<?> fileHandler) {
         boolean loaded = fileRecord != null;
         if (!loaded && fileHandler == null) {
             return null;

@@ -47,6 +47,7 @@ FROM alpine:3.18.12 AS final
 WORKDIR /app
 
 ARG TARGETARCH
+ARG RCLONE_RELEASE=v1.69.1
 ENV JAVA_HOME=/jre \
     PATH="/jre/bin:$PATH" \
     LANG=C.UTF-8 \
@@ -55,6 +56,16 @@ ENV JAVA_HOME=/jre \
 RUN addgroup -S tf && \
     adduser -S -G tf tf && \
     apk add --no-cache nginx wget curl unzip tini su-exec gettext openssl3 libstdc++ gcompat libc6-compat && \
+    case "$TARGETARCH" in \
+      amd64) RCLONE_ARCH=amd64 ;; \
+      arm64) RCLONE_ARCH=arm64 ;; \
+      *) echo "unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
+    esac && \
+    wget -qO /tmp/rclone.zip "https://downloads.rclone.org/${RCLONE_RELEASE}/rclone-${RCLONE_RELEASE}-linux-${RCLONE_ARCH}.zip" && \
+    unzip -q /tmp/rclone.zip -d /tmp && \
+    install -m 755 /tmp/rclone-${RCLONE_RELEASE}-linux-${RCLONE_ARCH}/rclone /usr/bin/rclone && \
+    rm -rf /tmp/rclone.zip /tmp/rclone-${RCLONE_RELEASE}-linux-${RCLONE_ARCH} && \
+    rclone version && \
     rm -rf /tmp/* /var/tmp/* && \
     touch /run/nginx.pid && \
     chown -R tf:tf /app /etc/nginx /var/lib/nginx /var/log/nginx /run/nginx.pid && \

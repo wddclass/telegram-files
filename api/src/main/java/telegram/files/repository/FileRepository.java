@@ -56,4 +56,12 @@ public interface FileRepository {
     Future<Void> updateTags(String uniqueId, String tags);
 
     Future<Void> deleteByUniqueId(String uniqueId);
+
+    Future<Void> updateRcloneStatus(String uniqueId, String status, String error);
+
+    Future<Integer> markRcloneBacklog(List<String> types);
+
+    Future<Integer> resetInterruptedRcloneUploads();
+
+    Future<List<FileRecord>> listRclonePending(int limit);
 }

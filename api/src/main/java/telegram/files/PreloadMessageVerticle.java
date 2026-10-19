@@ -10,8 +10,6 @@ import org.drinkless.tdlib.TdApi;
 import telegram.files.repository.FileRecord;
 import telegram.files.repository.SettingAutoRecords;
 
-import java.util.Optional;
-
 public class PreloadMessageVerticle extends AbstractVerticle {
 
     private static final Log log = LogFactory.get();
@@ -93,17 +91,24 @@ public class PreloadMessageVerticle extends AbstractVerticle {
             auto.complete(SettingAutoRecords.HISTORY_PRELOAD_STATE);
             return;
         }
+        TdApi.Message[] messages = Future.await(FileRecordRetriever.expandAlbums(auto.telegramId, foundChatMessages.messages, null)
+                .recover(err -> {
+                    log.warn("Expand albums during preload failed: %s".formatted(err.getMessage()));
+                    return Future.succeededFuture(foundChatMessages.messages);
+                }));
         int count = 0;
-        for (TdApi.Message message : foundChatMessages.messages) {
-            Optional<TdApiHelp.FileHandler<? extends TdApi.MessageContent>> fileHandlerOptional = TdApiHelp.getFileHandler(message);
-            if (fileHandlerOptional.isEmpty()) {
+        for (TdApi.Message message : messages) {
+            java.util.List<TdApiHelp.FileHandler<?>> handlers = TdApiHelp.getFileHandlers(message);
+            if (handlers.isEmpty()) {
                 continue;
             }
             TdApi.MessageThreadInfo messageThreadInfo = Future.await(telegramVerticle.client
                     .execute(new TdApi.GetMessageThread(message.chatId, message.id), true));
-            FileRecord fileRecord = fileHandlerOptional.get().convertFileRecord(auto.telegramId).withThreadInfo(messageThreadInfo);
-            if (Future.await(DataVerticle.fileRepository.createIfNotExist(fileRecord))) {
-                count++;
+            for (TdApiHelp.FileHandler<?> fileHandler : handlers) {
+                FileRecord fileRecord = fileHandler.convertFileRecord(auto.telegramId).withThreadInfo(messageThreadInfo);
+                if (Future.await(DataVerticle.fileRepository.createIfNotExist(fileRecord))) {
+                    count++;
+                }
             }
         }
 
@@ -125,18 +130,18 @@ public class PreloadMessageVerticle extends AbstractVerticle {
                 .ifPresent(telegramVerticle -> {
                     if (!telegramVerticle.authorized) return;
 
-                    Future.all(
-                                    telegramVerticle.client.execute(new TdApi.GetMessage(chatId, messageId)),
-                                    telegramVerticle.client.execute(new TdApi.GetMessageThread(chatId, messageId), true)
-                            )
-                            .onSuccess(result -> {
-                                TdApi.Message message = result.resultAt(0);
-                                TdApi.MessageThreadInfo messageThreadInfo = result.resultAt(1);
-                                TdApiHelp.getFileHandler(message).ifPresent(fileHandler -> {
-                                    FileRecord fileRecord = fileHandler.convertFileRecord(telegramId).withThreadInfo(messageThreadInfo);
-                                    DataVerticle.fileRepository.createIfNotExist(fileRecord);
-                                });
-                            })
+                    telegramVerticle.client.execute(new TdApi.GetMessage(chatId, messageId))
+                            .compose(message -> FileRecordRetriever.getAlbumMessages(telegramId, message))
+                            .compose(messages -> Future.all(java.util.Arrays.stream(messages)
+                                    .map(message -> telegramVerticle.client
+                                            .execute(new TdApi.GetMessageThread(message.chatId, message.id), true)
+                                            .compose(thread -> Future.all(TdApiHelp.getFileHandlers(message).stream()
+                                                    .map(fileHandler -> {
+                                                        FileRecord fileRecord = fileHandler.convertFileRecord(telegramId).withThreadInfo(thread);
+                                                        return DataVerticle.fileRepository.createIfNotExist(fileRecord);
+                                                    })
+                                                    .toList())))
+                                    .toList()))
                             .onFailure(e -> log.error("Preload message fail. Get message failed: %s".formatted(e.getMessage())));
                 });
     }

@@ -138,7 +138,7 @@ public class DataVerticleTest {
     @DisplayName("Test Get file record by primary key")
     void getFileRecordByPrimaryKeyTest(Vertx vertx, VertxTestContext testContext) {
         FileRecord fileRecord = new FileRecord(
-                1, "unique_id", 1, 1, 1, 1, 1, false, 1, 0, "type", "mime_type", "file_name", "thumbnail", "thumbnailUniqueId", "caption", "extra", "local_path", "download_status", "transfer_status", 0, null, null, 0, 0, 0
+                1, "unique_id", 1, 1, 1, 1, 1, false, 1, 0, "type", "mime_type", "file_name", "thumbnail", "thumbnailUniqueId", "caption", "extra", "local_path", "download_status", "transfer_status", 0, null, null, 0, 0, 0, null, null
         );
         DataVerticle.fileRepository.create(fileRecord)
                 .compose(r -> DataVerticle.fileRepository.getByPrimaryKey(r.id(), r.uniqueId()))
@@ -152,7 +152,7 @@ public class DataVerticleTest {
     @DisplayName("Test update file download status")
     void updateFileDownloadStatusTest(Vertx vertx, VertxTestContext testContext) {
         FileRecord fileRecord = new FileRecord(
-                1, "unique_id", 1, 1, 1, 1, 1, false, 1, 0, "type", "mime_type", "file_name", "thumbnail", "thumbnailUniqueId", "caption", "extra", null, FileRecord.DownloadStatus.idle.name(), FileRecord.TransferStatus.idle.name(), 0, null, null, 0, 0, 0
+                1, "unique_id", 1, 1, 1, 1, 1, false, 1, 0, "type", "mime_type", "file_name", "thumbnail", "thumbnailUniqueId", "caption", "extra", null, FileRecord.DownloadStatus.idle.name(), FileRecord.TransferStatus.idle.name(), 0, null, null, 0, 0, 0, null, null
         );
         String updateLocalPath = "local_path";
         Long completionDate = 1L;
@@ -179,7 +179,7 @@ public class DataVerticleTest {
     @DisplayName("Test update file transfer status")
     void updateFileTransferStatusTest(Vertx vertx, VertxTestContext testContext) {
         FileRecord fileRecord = new FileRecord(
-                1, "unique_id", 1, 1, 1, 1, 1, false, 1, 0, "type", "mime_type", "file_name", "thumbnail", "thumbnailUniqueId", "caption", "extra", null, FileRecord.DownloadStatus.idle.name(), FileRecord.TransferStatus.idle.name(), 0, null, null, 0, 0, 0
+                1, "unique_id", 1, 1, 1, 1, 1, false, 1, 0, "type", "mime_type", "file_name", "thumbnail", "thumbnailUniqueId", "caption", "extra", null, FileRecord.DownloadStatus.idle.name(), FileRecord.TransferStatus.idle.name(), 0, null, null, 0, 0, 0, null, null
         );
         String updateLocalPath = "local_path";
         DataVerticle.fileRepository.create(fileRecord)
@@ -194,6 +194,36 @@ public class DataVerticleTest {
                 .onComplete(testContext.succeeding(r -> testContext.verify(() -> {
                     Assertions.assertEquals(FileRecord.TransferStatus.completed.name(), r.transferStatus());
                     Assertions.assertEquals(updateLocalPath, r.localPath());
+                    testContext.completeNow();
+                })));
+    }
+
+    @Test
+    @DisplayName("Test rclone status is stored and not repeated once uploaded")
+    void updateRcloneStatusTest(Vertx vertx, VertxTestContext testContext) {
+        FileRecord fileRecord = new FileRecord(
+                1, "rclone_unique", 1, 1, 1, 1, 1, false, 1, 0, "video", "video/mp4", "clip.mp4", "thumbnail", "thumbnailUniqueId", "caption", "extra", "/data/clip.mp4", FileRecord.DownloadStatus.completed.name(), FileRecord.TransferStatus.idle.name(), 0, 1L, null, 0, 0, 0, null, null
+        );
+        DataVerticle.fileRepository.create(fileRecord)
+                .compose(r -> DataVerticle.fileRepository.markRcloneBacklog(java.util.List.of("video")))
+                .compose(updated -> {
+                    testContext.verify(() -> Assertions.assertEquals(1, updated));
+                    return DataVerticle.fileRepository.listRclonePending(10);
+                })
+                .compose(pending -> {
+                    testContext.verify(() -> {
+                        Assertions.assertEquals(1, pending.size());
+                        Assertions.assertEquals(FileRecord.RcloneStatus.pending.name(), pending.getFirst().rcloneStatus());
+                    });
+                    return DataVerticle.fileRepository.updateRcloneStatus(fileRecord.uniqueId(), FileRecord.RcloneStatus.uploaded.name(), null);
+                })
+                .compose(v -> DataVerticle.fileRepository.markRcloneBacklog(java.util.List.of("video")))
+                .compose(updated -> {
+                    testContext.verify(() -> Assertions.assertEquals(0, updated));
+                    return DataVerticle.fileRepository.getByUniqueId(fileRecord.uniqueId());
+                })
+                .onComplete(testContext.succeeding(r -> testContext.verify(() -> {
+                    Assertions.assertEquals(FileRecord.RcloneStatus.uploaded.name(), r.rcloneStatus());
                     testContext.completeNow();
                 })));
     }
