@@ -34,6 +34,8 @@ export type DownloadStatus =
 
 export type TransferStatus = "idle" | "transferring" | "completed" | "error";
 
+export type RcloneStatus = "pending" | "uploading" | "uploaded" | "failed";
+
 export type TelegramFile = {
   id: number;
   telegramId: number;
@@ -57,6 +59,8 @@ export type TelegramFile = {
   completionDate: number;
   originalDeleted: boolean;
   transferStatus?: TransferStatus;
+  rcloneStatus?: RcloneStatus | null;
+  rcloneError?: string | null;
   extra?: PhotoExtra | VideoExtra;
   tags?: string;
   loaded: boolean;
@@ -146,6 +150,7 @@ export const SettingKeys = [
   "avgSpeedInterval",
   "speedUnits",
   "tags",
+  "rclone",
 ] as const;
 
 export type SettingKey = (typeof SettingKeys)[number];

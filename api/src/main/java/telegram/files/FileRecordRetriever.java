@@ -1,16 +1,23 @@
 package telegram.files;
 
-import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.log.Log;
+import cn.hutool.log.LogFactory;
 import io.vertx.core.Future;
 import io.vertx.core.json.JsonObject;
 import org.drinkless.tdlib.TdApi;
 import telegram.files.repository.FileRecord;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 public class FileRecordRetriever {
+
+    private static final Log log = LogFactory.get();
+
+    private static final int ALBUM_FETCH_CONCURRENCY = 3;
 
     public static Future<JsonObject> getFiles(long chatId, Map<String, String> filter) {
         return DataVerticle.fileRepository.getFiles(chatId, filter)
@@ -145,33 +152,134 @@ public class FileRecordRetriever {
                 .getFilesByUniqueId(thumbnailUniqueIds);
     }
 
+    /**
+     * Load every message that belongs to the same media album as {@code message}.
+     * A link or a search hit is only one member. Albums hold up to 10 consecutive messages,
+     * which may be older or newer than the one we already have, so both directions are read
+     * from chat history. {@code searchChatMessages} is not used: it depends on the local search
+     * index and does not return the other members of an album.
+     */
     public static Future<TdApi.Message[]> getAlbumMessages(long telegramId, TdApi.Message message) {
         if (telegramId == 0 || message == null) {
             return Future.failedFuture("Message is null, unable to get album messages.");
         }
-        long mediaAlbumId = message.mediaAlbumId;
-        if (mediaAlbumId == 0) {
+        if (message.mediaAlbumId == 0) {
             return Future.succeededFuture(new TdApi.Message[]{message});
         }
         Optional<TelegramVerticle> telegramVerticleOptional = TelegramVerticles.get(telegramId);
         if (telegramVerticleOptional.isEmpty()) {
             return Future.failedFuture("Telegram verticle not found，unable to get the message. telegramId: " + telegramId);
         }
+        return fetchAlbum(telegramVerticleOptional.get().client, message);
+    }
 
-        TelegramClient telegramClient = telegramVerticleOptional.get().client;
+    /**
+     * Expand album hits inside a chat-file page. Messages that are not in an album are unchanged.
+     * {@code filter} limits siblings to the same file type the user is browsing; the search hit
+     * itself is always kept.
+     */
+    public static Future<TdApi.Message[]> expandAlbums(long telegramId,
+                                                       TdApi.Message[] messages,
+                                                       TdApi.SearchMessagesFilter filter) {
+        if (messages == null || messages.length == 0) {
+            return Future.succeededFuture(messages == null ? new TdApi.Message[0] : messages);
+        }
+        Map<Long, TdApi.Message> anchors = new LinkedHashMap<>();
+        for (TdApi.Message message : messages) {
+            if (AlbumMessages.isAlbum(message)) {
+                anchors.putIfAbsent(message.mediaAlbumId, message);
+            }
+        }
+        if (anchors.isEmpty()) {
+            return Future.succeededFuture(messages);
+        }
+        List<TdApi.Message> anchorList = new ArrayList<>(anchors.values());
+        Map<Long, TdApi.Message[]> albums = new ConcurrentHashMap<>();
+        int workers = Math.min(ALBUM_FETCH_CONCURRENCY, anchorList.size());
+        List<Future<?>> fetches = new ArrayList<>();
+        AtomicInteger index = new AtomicInteger();
+        for (int i = 0; i < workers; i++) {
+            fetches.add(fetchNextAlbum(telegramId, anchorList, index, albums));
+        }
+        return Future.all(fetches)
+                .map(ignored -> {
+                    TdApi.Message[] merged = AlbumMessages.mergePage(messages, albums, filter);
+                    if (merged.length != messages.length) {
+                        log.debug("Expanded media albums: searchHits=%d files=%d albums=%d"
+                                .formatted(messages.length, merged.length, anchors.size()));
+                    }
+                    return merged;
+                })
+                .recover(err -> {
+                    log.warn("Failed to expand media albums, keeping the search page: %s".formatted(err.getMessage()));
+                    return Future.succeededFuture(messages);
+                });
+    }
 
-        TdApi.SearchChatMessages searchChatMessages = new TdApi.SearchChatMessages();
-        searchChatMessages.chatId = message.chatId;
-        searchChatMessages.fromMessageId = message.id;
-        searchChatMessages.offset = -10;
-        searchChatMessages.limit = 11; // maximum number of messages to retrieve
-        return telegramClient.execute(searchChatMessages)
-                .map(foundChatMessages -> {
-                    TdApi.Message[] albumMessages = Arrays.stream(foundChatMessages.messages)
-                            .filter(msg -> msg.mediaAlbumId == mediaAlbumId)
-                            .toArray(TdApi.Message[]::new);
-                    ArrayUtil.insert(albumMessages, 0, message); // include the original message
-                    return albumMessages;
+    private static Future<Void> fetchNextAlbum(long telegramId,
+                                               List<TdApi.Message> anchors,
+                                               AtomicInteger index,
+                                               Map<Long, TdApi.Message[]> albums) {
+        int current = index.getAndIncrement();
+        if (current >= anchors.size()) {
+            return Future.succeededFuture();
+        }
+        TdApi.Message anchor = anchors.get(current);
+        return getAlbumMessages(telegramId, anchor)
+                .recover(err -> {
+                    log.debug("Album fetch failed for message %d: %s".formatted(anchor.id, err.getMessage()));
+                    return Future.succeededFuture(new TdApi.Message[]{anchor});
+                })
+                .compose(album -> {
+                    albums.put(anchor.mediaAlbumId, album);
+                    return fetchNextAlbum(telegramId, anchors, index, albums);
+                });
+    }
+
+    private static Future<TdApi.Message[]> fetchAlbum(TelegramClient client, TdApi.Message anchor) {
+        Map<Long, TdApi.Message> collected = new ConcurrentHashMap<>();
+        collected.put(anchor.id, anchor);
+        long albumId = anchor.mediaAlbumId;
+
+        Future<Void> byId = client.<TdApi.Messages>execute(new TdApi.GetMessages(anchor.chatId, AlbumMessages.neighborIds(anchor.id)))
+                .compose(loaded -> {
+                    AlbumMessages.absorbKnown(albumId, loaded == null ? null : loaded.messages, collected);
+                    return Future.<Void>succeededFuture();
+                })
+                .recover(err -> {
+                    log.debug("GetMessages album window failed for %d: %s".formatted(anchor.id, err.getMessage()));
+                    return Future.<Void>succeededFuture();
+                });
+        Future<Void> newer = walkHistory(client, anchor.chatId, albumId, anchor.id, AlbumMessages.Direction.NEWER, collected, 0);
+        Future<Void> older = walkHistory(client, anchor.chatId, albumId, anchor.id, AlbumMessages.Direction.OLDER, collected, 0);
+        return Future.all(byId, newer, older)
+                .map(ignored -> AlbumMessages.toOldestFirst(collected));
+    }
+
+    private static Future<Void> walkHistory(TelegramClient client,
+                                            long chatId,
+                                            long albumId,
+                                            long edgeId,
+                                            AlbumMessages.Direction direction,
+                                            Map<Long, TdApi.Message> collected,
+                                            int page) {
+        if (page >= AlbumMessages.MAX_HISTORY_PAGES || collected.size() >= AlbumMessages.MAX_ALBUM_SIZE) {
+            return Future.succeededFuture();
+        }
+        int offset = direction == AlbumMessages.Direction.NEWER ? -(AlbumMessages.MAX_ALBUM_SIZE - 1) : 0;
+        int limit = AlbumMessages.MAX_ALBUM_SIZE;
+        return client.execute(new TdApi.GetChatHistory(chatId, edgeId, offset, limit, false))
+                .compose(history -> {
+                    TdApi.Message[] messages = history == null ? null : history.messages;
+                    AlbumMessages.Walk walk = AlbumMessages.absorb(albumId, edgeId, direction, messages, collected);
+                    if (walk.done() || walk.nextEdge() == edgeId) {
+                        return Future.<Void>succeededFuture();
+                    }
+                    return walkHistory(client, chatId, albumId, walk.nextEdge(), direction, collected, page + 1);
+                })
+                .recover(err -> {
+                    log.debug("getChatHistory album walk failed from %d: %s".formatted(edgeId, err.getMessage()));
+                    return Future.<Void>succeededFuture();
                 });
     }
 }

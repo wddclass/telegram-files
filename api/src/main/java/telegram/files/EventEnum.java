@@ -37,6 +37,12 @@ public enum EventEnum {
      * body = JSONObject with "success", "message"
      */
     MAINTAIN,
+
+    /**
+     * suffix = null <br>
+     * body = file unique id to upload again
+     */
+    RCLONE_ENQUEUE,
     ;
 
     public String address() {

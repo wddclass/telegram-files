@@ -28,7 +28,11 @@ public enum SettingKey {
      * Speed units for displaying download speed, e.g., "bits" or "bytes"
      */
     speedUnits(Function.identity(), "bits"),
-    tags(value -> StrUtil.isBlank(value) ? null : StrUtil.split(value, ","));
+    tags(value -> StrUtil.isBlank(value) ? null : StrUtil.split(value, ",")),
+    /**
+     * Optional rclone upload. JSON, disabled unless {@code enabled} is true.
+     */
+    rclone(SettingRclone::fromJson, SettingRclone.defaults());
 
     public final Function<String, ?> converter;
 

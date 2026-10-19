@@ -3,11 +3,11 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches: [ "dev", "main" ]
+    branches: [ "dev", "main", "custom-0.3.1" ]
     paths:
       - 'api/**'
   pull_request:
-    branches: [ "main", "dev" ]
+    branches: [ "main", "dev", "custom-0.3.1" ]
     paths:
       - 'api/**'
 
@@ -75,7 +75,3 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

@@ -46,11 +46,13 @@ public class FileRepositoryImpl extends AbstractSqlRepository implements FileRep
                                                 size, downloaded_size,
                                                 type, mime_type,
                                                 file_name, thumbnail, thumbnail_unique_id, caption, extra, local_path,
-                                                download_status, start_date, transfer_status, tags, thread_chat_id, message_thread_id, reaction_count)
+                                                download_status, start_date, transfer_status, tags, thread_chat_id, message_thread_id, reaction_count,
+                                                rclone_status, rclone_error)
                         values (#{id}, #{unique_id}, #{telegram_id}, #{chat_id}, #{message_id}, #{media_album_id}, #{date},
                                 #{has_sensitive_content}, #{size}, #{downloaded_size}, #{type},
                                 #{mime_type}, #{file_name}, #{thumbnail}, #{thumbnail_unique_id}, #{caption}, #{extra}, #{local_path},
-                                #{download_status}, #{start_date}, #{transfer_status}, #{tags}, #{thread_chat_id}, #{message_thread_id}, #{reaction_count})
+                                #{download_status}, #{start_date}, #{transfer_status}, #{tags}, #{thread_chat_id}, #{message_thread_id}, #{reaction_count},
+                                #{rclone_status}, #{rclone_error})
                         """)
                 .mapFrom(FileRecord.PARAM_MAPPER)
                 .execute(fileRecord)
@@ -746,5 +748,86 @@ public class FileRepositoryImpl extends AbstractSqlRepository implements FileRep
                 .onFailure(err -> log.error("Failed to delete file record: %s".formatted(err.getMessage()))
                 )
                 .mapEmpty();
+    }
+
+    @Override
+    public Future<Void> updateRcloneStatus(String uniqueId, String status, String error) {
+        if (StrUtil.isBlank(uniqueId)) {
+            return Future.succeededFuture();
+        }
+        String storedError = error == null ? null : StrUtil.sub(error, 0, 1000);
+        Map<String, Object> params = new HashMap<>();
+        params.put("uniqueId", uniqueId);
+        params.put("status", status);
+        params.put("error", storedError);
+        return SqlTemplate
+                .forUpdate(sqlClient, """
+                        UPDATE file_record
+                        SET rclone_status = #{status},
+                            rclone_error = #{error}
+                        WHERE unique_id = #{uniqueId}
+                        """)
+                .execute(params)
+                .onFailure(err -> log.error("Failed to update rclone status: %s".formatted(err.getMessage())))
+                .mapEmpty();
+    }
+
+    @Override
+    public Future<Integer> markRcloneBacklog(List<String> types) {
+        List<String> safeTypes = types == null ? List.of() : types.stream()
+                .filter(type -> type != null && type.matches("photo|video|audio|file"))
+                .distinct()
+                .toList();
+        if (safeTypes.isEmpty()) {
+            return Future.succeededFuture(0);
+        }
+        String typeList = safeTypes.stream()
+                .map(type -> "'" + type + "'")
+                .collect(Collectors.joining(","));
+        return SqlTemplate
+                .forUpdate(sqlClient, """
+                        UPDATE file_record
+                        SET rclone_status = 'pending',
+                            rclone_error = NULL
+                        WHERE download_status = 'completed'
+                          AND type IN (%s)
+                          AND local_path IS NOT NULL
+                          AND local_path != ''
+                          AND (rclone_status IS NULL OR rclone_status = '')
+                        """.formatted(typeList))
+                .execute(Collections.emptyMap())
+                .map(SqlResult::rowCount)
+                .onFailure(err -> log.error("Failed to mark rclone backlog: %s".formatted(err.getMessage())));
+    }
+
+    @Override
+    public Future<Integer> resetInterruptedRcloneUploads() {
+        return SqlTemplate
+                .forUpdate(sqlClient, """
+                        UPDATE file_record
+                        SET rclone_status = 'pending'
+                        WHERE rclone_status = 'uploading'
+                        """)
+                .execute(Collections.emptyMap())
+                .map(SqlResult::rowCount)
+                .onFailure(err -> log.error("Failed to reset interrupted rclone uploads: %s".formatted(err.getMessage())));
+    }
+
+    @Override
+    public Future<List<FileRecord>> listRclonePending(int limit) {
+        int bounded = Math.max(1, Math.min(limit, 100));
+        return SqlTemplate
+                .forQuery(sqlClient, """
+                        SELECT * FROM file_record
+                        WHERE rclone_status = 'pending'
+                          AND download_status = 'completed'
+                          AND type != 'thumbnail'
+                        ORDER BY completion_date ASC
+                        LIMIT #{limit}
+                        """)
+                .mapTo(FileRecord.ROW_MAPPER)
+                .execute(Map.of("limit", bounded))
+                .map(IterUtil::toList)
+                .onFailure(err -> log.error("Failed to list pending rclone uploads: %s".formatted(err.getMessage())));
     }
 }

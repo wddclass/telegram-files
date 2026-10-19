@@ -90,6 +90,57 @@ Copy [docker-compose.yaml](docker-compose.yaml) and [.env.example](.env.example)
 docker-compose up -d
 ```
 
+### Fork image
+
+This fork publishes multi-arch images (`linux/amd64` and `linux/arm64`) to GHCR when `custom-0.3.1` is pushed, and when a `custom-*` tag is pushed. Pushes to `custom-0.3.1` are tagged `custom-latest` and `sha-<short>`. A git tag such as `custom-0.3.1` is published under that tag name.
+
+```yaml
+services:
+  telegram-files:
+    image: ghcr.io/wddclass/telegram-files:custom-latest
+    # or pin a build: ghcr.io/wddclass/telegram-files:sha-abcdef0
+    restart: always
+    ports:
+      - "6543:80"
+    environment:
+      APP_ENV: "prod"
+      APP_ROOT: "/app/data"
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
+    volumes:
+      - ./data:/app/data
+```
+
+The image name uses the repository owner in lowercase (`ghcr.io/<owner>/<repo>`). For this fork that is `ghcr.io/wddclass/telegram-files`.
+
+### Rclone upload
+
+Rclone upload is optional and **off by default**. Turn it on in Settings → Rclone upload. Downloaded files can be copied or moved to a remote such as Google Drive without blocking the download pipeline. Files already marked uploaded are not sent again. A failed upload can be retried from the file row.
+
+| Setting | Meaning |
+| --- | --- |
+| Remote path | rclone destination, for example `gdrive:telegram`. Files land at `remote/<chatId>/<messageId>/<fileName>`. |
+| Config file | Path to `rclone.conf` inside the container. Default `/app/data/rclone/rclone.conf`. |
+| Extra flags | Optional rclone flags, for example `--transfers 4`. |
+| Copy / Move | Copy leaves the local file. Move deletes it after a successful upload. |
+| Immediately | Queue an upload when each download completes. |
+| Scheduled | Interval in seconds (`3600`) or a 5-field cron expression (`0 */6 * * *`). Each run uploads completed files that match the type filter and are not uploaded yet. |
+| File types | Defaults to videos. |
+
+`rclone` is installed in the image. Put the config on the data volume (already mounted) or mount it yourself:
+
+```yaml
+services:
+  telegram-files:
+    image: ghcr.io/wddclass/telegram-files:custom-latest
+    volumes:
+      - ./data:/app/data
+      # optional explicit config mount; ./data/rclone/rclone.conf is used otherwise
+      - ./rclone.conf:/app/data/rclone/rclone.conf:ro
+```
+
+Create the remote on a machine that already has rclone (`rclone config`), then copy the resulting `rclone.conf` to `./data/rclone/rclone.conf`. The container user must be able to read that file.
+
 **Install on unRaid**
 
 On unRaid, install from the Community Repositories by searching for `telegram-files`.

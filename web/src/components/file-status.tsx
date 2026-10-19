@@ -1,18 +1,23 @@
-import { type TelegramFile } from "@/lib/types";
+import { type RcloneStatus, type TelegramFile } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
-import React from "react";
+import { Button } from "@/components/ui/button";
+import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { TooltipWrapper } from "@/components/ui/tooltip";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CheckCircle2,
   Clock,
+  CloudUpload,
   Download,
   FolderSync,
   Pause,
+  RotateCcw,
   XCircle,
 } from "lucide-react";
 import useIsMobile from "@/hooks/use-is-mobile";
+import { request } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
 export const DOWNLOAD_STATUS = {
   idle: {
@@ -39,6 +44,32 @@ export const DOWNLOAD_STATUS = {
     icon: XCircle,
     className: "bg-red-100 text-red-600",
     text: "Error",
+  },
+};
+
+export const RCLONE_STATUS: Record<
+  RcloneStatus,
+  { icon: typeof Clock; className: string; text: string }
+> = {
+  pending: {
+    icon: Clock,
+    className: "bg-gray-100 text-gray-600",
+    text: "Upload pending",
+  },
+  uploading: {
+    icon: CloudUpload,
+    className: "bg-blue-100 text-blue-600",
+    text: "Uploading",
+  },
+  uploaded: {
+    icon: CheckCircle2,
+    className: "bg-green-100 text-green-600",
+    text: "Uploaded",
+  },
+  failed: {
+    icon: XCircle,
+    className: "bg-red-100 text-red-600",
+    text: "Upload failed",
   },
 };
 
@@ -82,6 +113,29 @@ export default function FileStatus({
     exit: { opacity: 0, scale: 0.9, transition: { duration: 0.2 } },
   };
   const isMobile = useIsMobile();
+  const [retrying, setRetrying] = useState(false);
+  const rclone =
+    file.rcloneStatus && file.rcloneStatus in RCLONE_STATUS
+      ? RCLONE_STATUS[file.rcloneStatus]
+      : undefined;
+
+  async function retryUpload() {
+    setRetrying(true);
+    try {
+      await request(`/file/${file.uniqueId}/rclone-retry`, {
+        method: "POST",
+      });
+      toast({ variant: "success", description: "Upload queued again" });
+    } catch (error) {
+      toast({
+        variant: "error",
+        description:
+          error instanceof Error ? error.message : "Failed to retry upload",
+      });
+    } finally {
+      setRetrying(false);
+    }
+  }
 
   return (
     <div
@@ -131,6 +185,46 @@ export default function FileStatus({
               </TooltipWrapper>
             </motion.div>
           )}
+        {rclone && (
+          <motion.div
+            key="rclone-status"
+            variants={badgeVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            className="flex items-center space-x-1"
+          >
+            <TooltipWrapper
+              content={
+                file.rcloneStatus === "failed" && file.rcloneError
+                  ? file.rcloneError
+                  : "Rclone upload"
+              }
+            >
+              <Badge
+                className={cn(
+                  "h-6 text-xs hover:bg-gray-200",
+                  rclone.className,
+                  isMobile && "shadow-none",
+                )}
+              >
+                {rclone.text}
+              </Badge>
+            </TooltipWrapper>
+            {file.rcloneStatus === "failed" && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                disabled={retrying}
+                onClick={() => void retryUpload()}
+                aria-label="Retry rclone upload"
+              >
+                <RotateCcw className={cn("h-3 w-3", retrying && "animate-spin")} />
+              </Button>
+            )}
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );

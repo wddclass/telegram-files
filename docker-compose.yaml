@@ -1,7 +1,8 @@
 services:
   telegram-files:
     container_name: telegram-files
-    image: ghcr.io/jarvis2f/telegram-files:latest
+    # Fork image. Upstream 0.3.1 image: ghcr.io/jarvis2f/telegram-files:latest
+    image: ghcr.io/wddclass/telegram-files:custom-latest
     restart: always
     # Uncomment the following lines to enable health check for the service.
     #    depends_on:
@@ -35,6 +36,9 @@ services:
       - "6543:80"
     volumes:
       - ./data:/app/data
+      # rclone.conf is read from /app/data/rclone/rclone.conf by default, so placing it at
+      # ./data/rclone/rclone.conf is enough. Mount another file explicitly if you prefer:
+      # - ./rclone.conf:/app/data/rclone/rclone.conf:ro
       # - ./other-files-for-transfer:/app/other-files-for-transfer
 
 # Uncomment the following lines to enable database services.
