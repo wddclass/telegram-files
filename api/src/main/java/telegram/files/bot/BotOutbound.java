@@ -11,7 +11,10 @@ import java.util.function.LongSupplier;
 public final class BotOutbound {
 
     public interface Transport {
-        void send(long chatId, String text, JsonObject markup);
+        /**
+         * @param interactive command or button reply; must not wait behind the notification cap or the long poll
+         */
+        void send(long chatId, String text, JsonObject markup, boolean interactive);
 
         void edit(long chatId, int messageId, String text, JsonObject markup);
     }
@@ -44,12 +47,19 @@ public final class BotOutbound {
         this.clock = clock == null ? System::currentTimeMillis : clock;
     }
 
+    /**
+     * Command and button replies. These are not held for the per-minute cap; a single reply goes out immediately.
+     */
+    public void sendNow(long chatId, String text, JsonObject markup) {
+        transport.send(chatId, text, markup, true);
+    }
+
     public void send(long chatId, String text, JsonObject markup) {
-        offer(chatId, () -> transport.send(chatId, text, markup));
+        offer(chatId, () -> transport.send(chatId, text, markup, false));
     }
 
     public void edit(long chatId, int messageId, String text, JsonObject markup) {
-        offer(chatId, () -> transport.edit(chatId, messageId, text, markup));
+        transport.edit(chatId, messageId, text, markup);
     }
 
     private void offer(long chatId, Runnable delivery) {
@@ -67,7 +77,7 @@ public final class BotOutbound {
     private void flush() {
         flushScheduled = false;
         for (OutboundLimiter.Digest digest : limiter.flush(clock.getAsLong())) {
-            transport.send(digest.chatId(), texts.suppressed(digest.count()), null);
+            transport.send(digest.chatId(), texts.suppressed(digest.count()), null, false);
         }
         if (limiter.pending() && !flushScheduled) {
             flushScheduled = true;

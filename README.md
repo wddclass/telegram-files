@@ -162,7 +162,7 @@ rclone writes that exact object name (`copyto` or `moveto`). If a remote file wi
 
 ### Telegram Bot 控制（可选）
 
-不配置 `TG_BOT_TOKEN` 时，机器人不会启动，下载和网页不受影响。配置后，程序通过 Bot API **长轮询**收消息，不需要公网 Webhook。已确认的更新会把下一次轮询的 offset（最后一条 `update_id + 1`）写到数据目录的 `bot-offset.txt`，同一条更新（例如被重复投递的 `/start`）不会再次回复。向外发送的聊天消息大约每分钟不超过 20 条，多出来的合并成一条摘要。账号未授权或已登出导致的失败只记日志，不按文件刷屏。
+不配置 `TG_BOT_TOKEN` 时，机器人不会启动，下载和网页不受影响。配置后，程序通过 Bot API **长轮询**收消息，不需要公网 Webhook。已确认的更新会把机器人数字 ID 和下一次轮询的 offset（最后一条 `update_id + 1`）写到数据目录的 `bot-offset.txt`。换了 Bot Token，或文件里只有旧版本写下的 offset、没有机器人 ID 时，会重置 offset，避免把另一个机器人更大的 `update_id` 当成已处理。同一条更新在同一次运行里不会回复两次；Telegram 实际推送的更新都会处理。命令和按钮回复马上发出。完成通知大约每分钟不超过 20 条，多出来的合并成一条摘要。长轮询和发消息使用各自的 HTTP 连接，避免长轮询拖住回复。账号未授权或已登出导致的失败只记日志，不按文件刷屏。
 
 1. 在 Telegram 里找 [@BotFather](https://t.me/BotFather)，发送 `/newbot`，按提示创建机器人，复制 token。
 2. 查自己的数字用户 ID（不是 @用户名）。可以给 [@userinfobot](https://t.me/userinfobot) 或 [@getidsbot](https://t.me/getidsbot) 发一条消息。机器人日志里也会打出被拒绝的 `user id`，方便你把它加进白名单。

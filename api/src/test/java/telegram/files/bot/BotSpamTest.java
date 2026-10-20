@@ -5,7 +5,6 @@ import io.vertx.core.json.JsonObject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -67,10 +66,41 @@ public class BotSpamTest {
         assertEquals(101L, echoed.getLong("offset"));
 
         Path offsetFile = temp.resolve("bot-offset.txt");
-        BotFiles.writeAtomically(offsetFile, Long.toString(cursor.offset()));
-        BotUpdateCursor restarted = new BotUpdateCursor(Long.parseLong(Files.readString(offsetFile).trim()));
-        assertTrue(restarted.accept(batch).isEmpty());
-        assertEquals(101, restarted.offset());
+        BotFiles.writeAtomically(offsetFile, BotOffsetFile.encode(5, cursor.offset()));
+        BotOffsetFile.Loaded sameBot = BotOffsetFile.load(offsetFile, 5);
+        assertFalse(sameBot.reset());
+        assertEquals(101, sameBot.offset());
+    }
+
+    @Test
+    void staleOffsetFromAnotherBotIsResetAndLowerUpdateIdsAreConfirmed() throws Exception {
+        BotOffsetFile.Loaded legacy = BotOffsetFile.parse("484995938", 5);
+        assertTrue(legacy.reset());
+        assertEquals(0, legacy.offset());
+
+        BotOffsetFile.Loaded otherBot = BotOffsetFile.parse("111 484995938", 5);
+        assertTrue(otherBot.reset());
+        assertEquals(0, otherBot.offset());
+        assertTrue(otherBot.reason().contains("111"));
+
+        assertEquals(5, BotSettings.botId("5:abc_DEF"));
+        assertEquals("5 187620024", BotOffsetFile.encode(5, 187620024));
+
+        Path offsetFile = temp.resolve("bot-offset.txt");
+        BotFiles.writeAtomically(offsetFile, "484995938");
+        BotOffsetFile.Loaded loaded = BotOffsetFile.load(offsetFile, 5);
+        assertTrue(loaded.reset());
+        assertEquals(0, loaded.offset());
+
+        // The stored offset was the previous bot's update_id. Telegram still delivers this bot's smaller ids.
+        JsonArray delivered = new JsonObject("""
+                {"ok":true,"result":[{"update_id":187620023,"message":{"message_id":1,"text":"/start"}}]}
+                """).getJsonArray("result");
+        BotUpdateCursor cursor = new BotUpdateCursor(484995938);
+        assertEquals(1, cursor.accept(delivered).size());
+        assertEquals(187620024L, cursor.offset());
+        assertTrue(cursor.accept(delivered).isEmpty());
+        assertEquals(187620024L, cursor.offset());
     }
 
     @Test
@@ -111,7 +141,7 @@ public class BotSpamTest {
                 new BotTexts(true),
                 new BotOutbound.Transport() {
                     @Override
-                    public void send(long chatId, String text, JsonObject markup) {
+                    public void send(long chatId, String text, JsonObject markup, boolean interactive) {
                         sent.add(text);
                     }
 
@@ -137,6 +167,40 @@ public class BotSpamTest {
         assertEquals(21, sent.size());
         assertTrue(sent.get(20).contains("已合并 5"));
         assertTrue(sent.get(20).contains("/downloads"));
+    }
+
+    @Test
+    void singleReplyIsSentImmediatelyEvenWhenNotificationsAreCapped() {
+        List<String> sent = new ArrayList<>();
+        List<Long> waits = new ArrayList<>();
+        long[] now = {5_000};
+        BotOutbound outbound = new BotOutbound(
+                new BotTexts(true),
+                new BotOutbound.Transport() {
+                    @Override
+                    public void send(long chatId, String text, JsonObject markup, boolean interactive) {
+                        sent.add(interactive ? "now:" + text : text);
+                    }
+
+                    @Override
+                    public void edit(long chatId, int messageId, String text, JsonObject markup) {
+                        sent.add("edit:" + text);
+                    }
+                },
+                (delay, action) -> waits.add(delay),
+                new OutboundLimiter(20, 60_000),
+                () -> now[0]
+        );
+        outbound.sendNow(5, "help", null);
+        assertEquals(List.of("now:help"), sent);
+        assertTrue(waits.isEmpty());
+
+        for (int i = 0; i < 20; i++) {
+            outbound.send(5, "notice " + i, null);
+        }
+        outbound.sendNow(5, "status", null);
+        assertEquals("now:status", sent.getLast());
+        assertTrue(waits.isEmpty());
     }
 
     @Test
