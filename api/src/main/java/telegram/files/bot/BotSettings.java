@@ -19,6 +19,28 @@ public record BotSettings(
         return token != null && !token.isBlank();
     }
 
+    /**
+     * Numeric id in front of {@code :} in the bot token. Offset files are tied to this id.
+     */
+    public long botId() {
+        return botId(token);
+    }
+
+    public static long botId(String token) {
+        if (token == null) {
+            return 0;
+        }
+        int colon = token.indexOf(':');
+        if (colon <= 0) {
+            return 0;
+        }
+        try {
+            return Long.parseLong(token.substring(0, colon));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
     public static BotSettings fromEnvironment() {
         return from(
                 System.getenv("TG_BOT_TOKEN"),

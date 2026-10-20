@@ -13,7 +13,6 @@ import telegram.files.EventEnum;
 import telegram.files.EventPayload;
 import telegram.files.repository.FileRecord;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -60,6 +59,8 @@ public class BotVerticle extends AbstractVerticle {
 
     private long lastInactiveLog;
 
+    private boolean rewriteOffset;
+
     private Path offsetFile;
 
     public BotVerticle(BotSettings settings) {
@@ -75,6 +76,9 @@ public class BotVerticle extends AbstractVerticle {
             subscribers = new BotSubscribers(root.resolve("bot-subscribers.json"));
             offsetFile = root.resolve("bot-offset.txt");
             cursor = new BotUpdateCursor(readOffset());
+            if (rewriteOffset) {
+                writeOffset();
+            }
             notices = new NoticeLedger(root.resolve("bot-notices.log"));
             outbound = new BotOutbound(
                     texts,
@@ -92,7 +96,7 @@ public class BotVerticle extends AbstractVerticle {
                     sessions,
                     subscribers::remember
             );
-            log.info("Telegram bot getUpdates offset starts at %d".formatted(cursor.offset()));
+            log.info("Telegram bot %d getUpdates offset starts at %d".formatted(settings.botId(), cursor.offset()));
             if (settings.allowlist().isEmpty()) {
                 log.warn("TG_BOT_TOKEN is set but TG_BOT_ALLOWED_USERS is empty. The bot will ignore every update.");
             } else {
@@ -132,8 +136,8 @@ public class BotVerticle extends AbstractVerticle {
     private BotOutbound.Transport transport() {
         return new BotOutbound.Transport() {
             @Override
-            public void send(long chatId, String text, JsonObject markup) {
-                api.sendMessage(chatId, text, markup)
+            public void send(long chatId, String text, JsonObject markup, boolean interactive) {
+                api.sendMessage(chatId, text, markup, interactive)
                         .onFailure(err -> log.warn("Bot sendMessage to %d failed: %s".formatted(chatId, err.getMessage())));
             }
 
@@ -149,7 +153,7 @@ public class BotVerticle extends AbstractVerticle {
         return new BotGateway() {
             @Override
             public void send(long chatId, String text, JsonObject replyMarkup) {
-                outbound.send(chatId, text, replyMarkup);
+                outbound.sendNow(chatId, text, replyMarkup);
             }
 
             @Override
@@ -362,28 +366,20 @@ public class BotVerticle extends AbstractVerticle {
     }
 
     private long readOffset() {
-        try {
-            if (offsetFile == null || !Files.exists(offsetFile)) {
-                return 0;
-            }
-            String text = Files.readString(offsetFile).trim();
-            return text.isEmpty() ? 0 : Long.parseLong(text);
-        } catch (Exception e) {
-            log.error("Could not read bot offset, starting at 0. Pending updates may be delivered again: %s".formatted(e.getMessage()));
-            return 0;
+        BotOffsetFile.Loaded loaded = BotOffsetFile.load(offsetFile, settings.botId());
+        rewriteOffset = loaded.reset();
+        if (loaded.reset() && loaded.reason() != null) {
+            log.warn(loaded.reason());
         }
+        return loaded.offset();
     }
 
     private void writeOffset() {
-        if (offsetFile == null) {
+        if (offsetFile == null || cursor == null) {
             return;
         }
         try {
-            Path parent = offsetFile.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-            BotFiles.writeAtomically(offsetFile, Long.toString(cursor.offset()));
+            BotFiles.writeAtomically(offsetFile, BotOffsetFile.encode(settings.botId(), cursor.offset()));
         } catch (Exception e) {
             log.warn("Could not store bot offset: %s".formatted(e.getMessage()));
         }

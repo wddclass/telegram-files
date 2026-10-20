@@ -5,6 +5,8 @@ import cn.hutool.log.LogFactory;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
+import io.vertx.core.http.HttpVersion;
+import io.vertx.core.http.PoolOptions;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.client.HttpResponse;
 import io.vertx.ext.web.client.WebClient;
@@ -15,8 +17,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Bot API client. Long polling uses {@link #call}; chat messages go through a small queue so a 429
- * backs off instead of failing the verticle.
+ * Bot API client. Long polling uses its own HTTP client so a 50s {@code getUpdates} cannot sit in front of a
+ * reply. Chat messages go through a small queue so a 429 backs off instead of failing the verticle.
+ * Command replies skip that queue's gap and are not held behind notifications.
  */
 public final class BotApiClient {
 
@@ -24,22 +27,37 @@ public final class BotApiClient {
 
     private final Vertx vertx;
 
-    private final WebClient client;
+    private final WebClient polling;
+
+    private final WebClient sending;
 
     private final String base;
 
-    private final ConcurrentLinkedQueue<Pending> queue = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<Pending> interactive = new ConcurrentLinkedQueue<>();
+
+    private final ConcurrentLinkedQueue<Pending> bulk = new ConcurrentLinkedQueue<>();
 
     private final AtomicBoolean draining = new AtomicBoolean(false);
 
-    private BotApiClient(Vertx vertx, WebClient client, String base) {
+    private BotApiClient(Vertx vertx, WebClient polling, WebClient sending, String base) {
         this.vertx = vertx;
-        this.client = client;
+        this.polling = polling;
+        this.sending = sending;
         this.base = base;
     }
 
     public static BotApiClient create(Vertx vertx, BotSettings settings) {
+        // Separate HTTP/1.1 pools: one held getUpdates connection must not block sendMessage.
+        WebClientOptions shared = options(settings);
+        return new BotApiClient(vertx,
+                WebClient.create(vertx, shared, new PoolOptions().setHttp1MaxSize(1)),
+                WebClient.create(vertx, new WebClientOptions(shared), new PoolOptions().setHttp1MaxSize(4)),
+                "https://api.telegram.org/bot" + settings.token() + "/");
+    }
+
+    private static WebClientOptions options(BotSettings settings) {
         WebClientOptions options = new WebClientOptions()
+                .setProtocolVersion(HttpVersion.HTTP_1_1)
                 .setKeepAlive(true)
                 .setConnectTimeout(15_000)
                 .setIdleTimeout(120)
@@ -47,8 +65,7 @@ public final class BotApiClient {
         if (settings.proxy() != null) {
             options.setProxyOptions(settings.proxy().toOptions());
         }
-        return new BotApiClient(vertx, WebClient.create(vertx, options),
-                "https://api.telegram.org/bot" + settings.token() + "/");
+        return options;
     }
 
     public Future<JsonObject> call(String method, JsonObject body) {
@@ -56,12 +73,16 @@ public final class BotApiClient {
     }
 
     public Future<JsonObject> sendMessage(long chatId, String text, JsonObject replyMarkup) {
-        return enqueue("sendMessage", messageBody(chatId, text, replyMarkup));
+        return sendMessage(chatId, text, replyMarkup, false);
+    }
+
+    public Future<JsonObject> sendMessage(long chatId, String text, JsonObject replyMarkup, boolean interactive) {
+        return enqueue("sendMessage", messageBody(chatId, text, replyMarkup), interactive);
     }
 
     public Future<JsonObject> editMessageText(long chatId, int messageId, String text, JsonObject replyMarkup) {
         JsonObject body = messageBody(chatId, text, replyMarkup).put("message_id", messageId);
-        return enqueue("editMessageText", body);
+        return enqueue("editMessageText", body, true);
     }
 
     public Future<JsonObject> answerCallbackQuery(String callbackId, String text) {
@@ -69,10 +90,18 @@ public final class BotApiClient {
         if (text != null && !text.isBlank()) {
             body.put("text", BotTexts.clip(text, 180)).put("show_alert", false);
         }
-        return enqueue("answerCallbackQuery", body);
+        return enqueue("answerCallbackQuery", body, true);
     }
 
     public void close() {
+        closeQuietly(polling);
+        closeQuietly(sending);
+    }
+
+    private static void closeQuietly(WebClient client) {
+        if (client == null) {
+            return;
+        }
         try {
             client.close();
         } catch (Exception e) {
@@ -80,9 +109,10 @@ public final class BotApiClient {
         }
     }
 
-    private Future<JsonObject> enqueue(String method, JsonObject body) {
+    private Future<JsonObject> enqueue(String method, JsonObject body, boolean interactiveSend) {
         Promise<JsonObject> promise = Promise.promise();
-        queue.add(new Pending(method, body, promise, 0));
+        Pending pending = new Pending(method, body, promise, 0, interactiveSend);
+        (interactiveSend ? interactive : bulk).add(pending);
         drain();
         return promise.future();
     }
@@ -91,7 +121,7 @@ public final class BotApiClient {
         if (!draining.compareAndSet(false, true)) {
             return;
         }
-        Pending pending = queue.poll();
+        Pending pending = pollQueue();
         if (pending == null) {
             draining.set(false);
             return;
@@ -101,7 +131,8 @@ public final class BotApiClient {
                     && error.retryAfterSeconds() > 0 && pending.attempt < 5) {
                 log.warn("Bot API %s rate limited, retrying in %ds".formatted(pending.method, error.retryAfterSeconds()));
                 vertx.setTimer(error.retryAfterSeconds() * 1000L, _ -> {
-                    queue.add(new Pending(pending.method, pending.body, pending.promise, pending.attempt + 1));
+                    (pending.interactive ? interactive : bulk)
+                            .add(new Pending(pending.method, pending.body, pending.promise, pending.attempt + 1, pending.interactive));
                     draining.set(false);
                     drain();
                 });
@@ -112,6 +143,12 @@ public final class BotApiClient {
             } else {
                 pending.promise.fail(result.cause());
             }
+            // A command reply waiting behind a notification should not also wait out the spacing gap.
+            if (!interactive.isEmpty() || bulk.isEmpty()) {
+                draining.set(false);
+                drain();
+                return;
+            }
             vertx.setTimer(40, _ -> {
                 draining.set(false);
                 drain();
@@ -119,9 +156,15 @@ public final class BotApiClient {
         });
     }
 
+    private Pending pollQueue() {
+        Pending next = interactive.poll();
+        return next != null ? next : bulk.poll();
+    }
+
     private Future<JsonObject> post(String method, JsonObject body) {
         Promise<JsonObject> promise = Promise.promise();
         long timeout = "getUpdates".equals(method) ? 70_000L : 30_000L;
+        WebClient client = "getUpdates".equals(method) ? polling : sending;
         client.postAbs(base + method)
                 .timeout(timeout)
                 .sendJsonObject(body)
@@ -174,6 +217,6 @@ public final class BotApiClient {
         return json;
     }
 
-    private record Pending(String method, JsonObject body, Promise<JsonObject> promise, int attempt) {
+    private record Pending(String method, JsonObject body, Promise<JsonObject> promise, int attempt, boolean interactive) {
     }
 }
