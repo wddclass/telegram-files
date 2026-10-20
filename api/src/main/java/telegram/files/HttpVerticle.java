@@ -30,6 +30,8 @@ import io.vertx.ext.web.sstore.LocalSessionStore;
 import io.vertx.ext.web.sstore.SessionStore;
 import org.drinkless.tdlib.TdApi;
 import org.jooq.lambda.function.Function2;
+import telegram.files.bot.BotSettings;
+import telegram.files.bot.BotVerticle;
 import telegram.files.repository.FileRecord;
 import telegram.files.repository.SettingAutoRecords;
 import telegram.files.repository.SettingKey;
@@ -66,6 +68,7 @@ public class HttpVerticle extends AbstractVerticle {
                 .compose(_ -> initTransferVerticle())
                 .compose(_ -> initPreloadMessageVerticle())
                 .compose(_ -> initRcloneVerticle())
+                .compose(_ -> initBotVerticle())
                 .compose(_ -> initEventConsumer())
                 .onSuccess(startPromise::complete)
                 .onFailure(startPromise::fail);
@@ -228,6 +231,26 @@ public class HttpVerticle extends AbstractVerticle {
 
     public Future<Void> initRcloneVerticle() {
         return vertx.deployVerticle(new RcloneVerticle(), Config.VIRTUAL_THREAD_DEPLOYMENT_OPTIONS)
+                .mapEmpty();
+    }
+
+    /**
+     * Optional Bot API control. A missing token, a bad proxy, or a polling failure must not stop the app.
+     */
+    public Future<Void> initBotVerticle() {
+        BotSettings settings = BotSettings.fromEnvironment();
+        if (settings.configError() != null) {
+            log.error("Telegram bot control not started: %s".formatted(settings.configError()));
+            return Future.succeededFuture();
+        }
+        if (!settings.enabled()) {
+            log.info("Telegram bot control is disabled (TG_BOT_TOKEN is not set)");
+            return Future.succeededFuture();
+        }
+        return vertx.deployVerticle(new BotVerticle(settings))
+                .onSuccess(_ -> log.info("Telegram bot control started"))
+                .onFailure(err -> log.error("Telegram bot control failed to start: %s".formatted(err.getMessage())))
+                .recover(_ -> Future.succeededFuture())
                 .mapEmpty();
     }
 

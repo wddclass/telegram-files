@@ -64,4 +64,8 @@ public interface FileRepository {
     Future<Integer> resetInterruptedRcloneUploads();
 
     Future<List<FileRecord>> listRclonePending(int limit);
+
+    Future<Integer> countRcloneStatus(String status);
+
+    Future<List<FileRecord>> listRcloneStatus(String status, int limit);
 }
