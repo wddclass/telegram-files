@@ -14,6 +14,8 @@ import telegram.files.repository.SettingRclone;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -30,6 +32,8 @@ public class RcloneVerticle extends AbstractVerticle {
     private static final int SCHEDULE_CHECK_MS = 30_000;
 
     private final ConcurrentLinkedQueue<String> queue = new ConcurrentLinkedQueue<>();
+
+    private final ConcurrentHashMap<Long, CachedAccount> accountCache = new ConcurrentHashMap<>();
 
     private final AtomicBoolean draining = new AtomicBoolean(false);
 
@@ -186,9 +190,10 @@ public class RcloneVerticle extends AbstractVerticle {
                 if (!FileUtil.exist(configPath)) {
                     return fail(record, "rclone config not found: " + configPath);
                 }
+                return accountLabel(record.telegramId()).compose(label -> {
                 List<String> command;
                 try {
-                    command = RcloneCommand.build(settings, Config.APP_ROOT, Path.of(record.localPath()), record.chatId(), record.messageId());
+                    command = RcloneCommand.build(settings, Config.APP_ROOT, Path.of(record.localPath()), pathValues(record, label));
                 } catch (RuntimeException e) {
                     return fail(record, e.getMessage());
                 }
@@ -206,6 +211,7 @@ public class RcloneVerticle extends AbstractVerticle {
                                     .onSuccess(__ -> publishStatus(record, FileRecord.RcloneStatus.uploaded.name(), null))
                                     .mapEmpty();
                         });
+                });
             });
         }).recover(err -> {
             log.error("Rclone upload failed for %s: %s".formatted(uniqueId, err.getMessage()));
@@ -247,11 +253,48 @@ public class RcloneVerticle extends AbstractVerticle {
                 && StrUtil.isNotBlank(record.localPath());
     }
 
+    private static RclonePaths.Values pathValues(FileRecord record, RclonePaths.AccountLabel label) {
+        String fileName = Path.of(record.localPath()).getFileName().toString();
+        return new RclonePaths.Values(
+                label.id() == 0 ? record.telegramId() : label.id(),
+                label.name(),
+                label.username(),
+                record.chatId(),
+                chatTitle(record),
+                record.messageId(),
+                record.type(),
+                fileName,
+                record.completionDate());
+    }
+
+    private static String chatTitle(FileRecord record) {
+        return TelegramVerticles.get(record.telegramId())
+                .map(verticle -> verticle.getChat(record.chatId()))
+                .map(chat -> chat.title)
+                .orElse(null);
+    }
+
+    private Future<RclonePaths.AccountLabel> accountLabel(long telegramId) {
+        CachedAccount cached = accountCache.get(telegramId);
+        if (cached != null && cached.expiresAt > System.currentTimeMillis()) {
+            return Future.succeededFuture(cached.label);
+        }
+        Optional<TelegramVerticle> verticle = TelegramVerticles.get(telegramId);
+        if (verticle.isEmpty()) {
+            return Future.succeededFuture(new RclonePaths.AccountLabel(telegramId, null, null));
+        }
+        return verticle.get().accountLabel()
+                .onSuccess(label -> accountCache.put(telegramId, new CachedAccount(label, System.currentTimeMillis() + 600_000)));
+    }
+
     private Future<SettingRclone> loadSettings() {
         return DataVerticle.settingRepository.<SettingRclone>getByKey(SettingKey.rclone)
                 .recover(err -> {
                     log.warn("Failed to load rclone settings: %s".formatted(err.getMessage()));
                     return Future.succeededFuture(SettingRclone.defaults());
                 });
+    }
+
+    private record CachedAccount(RclonePaths.AccountLabel label, long expiresAt) {
     }
 }

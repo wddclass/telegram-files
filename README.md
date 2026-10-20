@@ -119,7 +119,9 @@ Rclone upload is optional and **off by default**. Turn it on in Settings → Rcl
 
 | Setting | Meaning |
 | --- | --- |
-| Remote path | rclone destination, for example `gdrive:telegram`. Files land at `remote/<chatId>/<messageId>/<fileName>`. |
+| Remote path | rclone destination, for example `googledrive:WC/CC`. |
+| Path template | Relative path under the remote. Default `{chatId}/{messageId}/{fileName}`, which is the previous layout. |
+| Date timezone | IANA zone for `{date:...}`. Empty uses the container `TZ` variable, then `Asia/Shanghai`. The date is the file's download-completion time. |
 | Config file | Path to `rclone.conf` inside the container. Default `/app/data/rclone/rclone.conf`. |
 | Extra flags | Optional rclone flags, for example `--transfers 4`. |
 | Copy / Move | Copy leaves the local file. Move deletes it after a successful upload. |
@@ -140,6 +142,23 @@ services:
 ```
 
 Create the remote on a machine that already has rclone (`rclone config`), then copy the resulting `rclone.conf` to `./data/rclone/rclone.conf`. The container user must be able to read that file.
+
+Path placeholders:
+
+| Placeholder | Value |
+| --- | --- |
+| `{date:FORMAT}` | Completion time formatted with a Java `DateTimeFormatter` pattern, for example `{date:yyyy-MM-dd}` or `{date:yyyyMMdd}`. A `/` in the pattern creates another folder. |
+| `{accountName}` | Account display name (first name and last name). |
+| `{accountUsername}` | Telegram username without `@`. If the account has none, the account id is used. |
+| `{accountId}` | Telegram user id of the account that downloaded the file. |
+| `{chatTitle}` | Chat title. If it is unknown, `chat-<chatId>`. |
+| `{chatId}` `{messageId}` `{type}` `{fileName}` | Chat id, message id, file type, and the local file name. |
+
+`{accountName}` and `{chatTitle}` keep Unicode, including styled letters such as `𝘄𝗱𝗱𝘇𝘇𝘇`. They are not converted to ASCII. `/ \ : * ? " < > |` and control characters become `_`. Usernames keep letters, digits, and `_`.
+
+To reproduce a date folder named after the account, set the remote to `googledrive:WC/CC` and the template to `{accountName}-{date:yyyyMMdd}/{fileName}`. A file finished on 19 October 2026 in `Asia/Shanghai` for an account named `𝘄𝗱𝗱𝘇𝘇𝘇` is uploaded to `googledrive:WC/CC/𝘄𝗱𝗱𝘇𝘇𝘇-20261019/clip.mp4`. The settings page previews the path and uses the selected account's real name when one is signed in. Chat title and file name in that preview are samples.
+
+rclone writes that exact object name (`copyto` or `moveto`). If a remote file with the same name already exists and is identical, rclone skips it. If the contents differ, rclone replaces the remote file. Add `{messageId}` to the template when file names can repeat on the same day.
 
 **Install on unRaid**
 

@@ -144,6 +144,7 @@ public class HttpVerticle extends AbstractVerticle {
 
         router.get("/settings").handler(this::handleSettings);
         router.post("/settings/create").handler(this::handleSettingsCreate);
+        router.post("/settings/rclone-path-preview").handler(this::handleRclonePathPreview);
 
         router.post("/telegram/create").handler(this::handleTelegramCreate);
         router.post("/telegram/:telegramId/delete").handler(this::handleTelegramDelete);
@@ -341,6 +342,41 @@ public class HttpVerticle extends AbstractVerticle {
                     ));
                     vertx.eventBus().publish(EventEnum.RCLONE_ENQUEUE.address(), uniqueId);
                     ctx.json(new JsonObject().put("rcloneStatus", FileRecord.RcloneStatus.pending.name()));
+                })
+                .onFailure(ctx::fail);
+    }
+
+    private void handleRclonePathPreview(RoutingContext ctx) {
+        JsonObject body = ctx.body().asJsonObject();
+        if (body == null) {
+            ctx.fail(400);
+            return;
+        }
+        String remote = body.getString("remote", "");
+        String pathTemplate = body.getString("pathTemplate", "");
+        String timeZone = body.getString("timeZone", "");
+        long telegramId = Convert.toLong(body.getString("telegramId"), 0L);
+        Future<RclonePaths.AccountLabel> account = telegramId == 0
+                ? Future.succeededFuture(null)
+                : TelegramVerticles.get(telegramId)
+                .map(TelegramVerticle::accountLabel)
+                .orElseGet(() -> Future.succeededFuture(null));
+        account.onSuccess(label -> {
+                    boolean usingAccount = label != null && (label.id() != 0 || StrUtil.isNotBlank(label.name()));
+                    try {
+                        java.time.ZoneId zone = RclonePaths.resolveZone(timeZone);
+                        RclonePaths.Values values = RclonePaths.sample(usingAccount ? label : null);
+                        String relative = RclonePaths.render(pathTemplate, zone, values);
+                        String destination = StrUtil.isBlank(remote) ? relative : RcloneCommand.joinRemote(remote, relative);
+                        ctx.json(new JsonObject()
+                                .put("destination", destination)
+                                .put("timeZone", zone.getId())
+                                .put("accountName", values.accountName())
+                                .put("accountUsername", values.accountUsername())
+                                .put("usingAccount", usingAccount));
+                    } catch (RuntimeException e) {
+                        ctx.json(new JsonObject().put("error", e.getMessage()));
+                    }
                 })
                 .onFailure(ctx::fail);
     }

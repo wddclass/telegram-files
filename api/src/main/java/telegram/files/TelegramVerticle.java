@@ -164,7 +164,8 @@ public class TelegramVerticle extends AbstractVerticle {
                     .onSuccess(user -> {
                         JsonObject result = new JsonObject()
                                 .put("id", Convert.toStr(user.id))
-                                .put("name", StrUtil.join(user.firstName, " ", user.lastName))
+                                .put("name", RclonePaths.displayName(user.firstName, user.lastName))
+                                .put("username", RclonePaths.primaryUsername(user.usernames))
                                 .put("phoneNumber", user.phoneNumber)
                                 .put("avatar", Base64.encode((byte[]) BeanUtil.getProperty(user, "profilePhoto.minithumbnail.data")))
                                 .put("status", "active")
@@ -186,6 +187,24 @@ public class TelegramVerticle extends AbstractVerticle {
 
     public TdApi.Chat getChat(long chatId) {
         return telegramChats.getChat(chatId);
+    }
+
+    /**
+     * Name and username of the account that owns downloaded files.
+     * An inactive session falls back to the stored first name.
+     */
+    public Future<RclonePaths.AccountLabel> accountLabel() {
+        long id = telegramRecord == null ? 0 : telegramRecord.id();
+        String storedName = telegramRecord == null ? null : telegramRecord.firstName();
+        if (!authorized || client == null) {
+            return Future.succeededFuture(new RclonePaths.AccountLabel(id, storedName, null));
+        }
+        return client.<TdApi.User>execute(new TdApi.GetMe())
+                .map(user -> new RclonePaths.AccountLabel(
+                        user.id,
+                        RclonePaths.displayName(user.firstName, user.lastName),
+                        RclonePaths.primaryUsername(user.usernames)))
+                .recover(err -> Future.succeededFuture(new RclonePaths.AccountLabel(id, storedName, null)));
     }
 
     public Future<JsonObject> getChatFiles(long chatId, Map<String, String> filter) {
