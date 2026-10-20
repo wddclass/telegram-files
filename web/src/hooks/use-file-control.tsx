@@ -2,8 +2,10 @@ import { type TelegramFile } from "@/lib/types";
 import useSWRMutation from "swr/mutation";
 import { POST } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
+import { useTranslations } from "next-intl";
 
 export function useFileControl(file: TelegramFile) {
+  const t = useTranslations("files");
   const { trigger: startDownload, isMutating: starting } = useSWRMutation(
     `/${file.telegramId}/file/start-download`,
     (
@@ -39,7 +41,7 @@ export function useFileControl(file: TelegramFile) {
         if (!file.uniqueId || file.uniqueId.trim() === "") {
           toast({
             variant: "error",
-            description: "☹️Sorry, this file cannot be downloaded",
+            description: t("cannotDownload"),
           });
           return;
         }

@@ -1,5 +1,6 @@
 import useSWR from "swr";
 import { ChevronsLeftRightEllipsis } from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
   Tooltip,
   TooltipContent,
@@ -8,6 +9,7 @@ import {
 } from "@/components/ui/tooltip";
 
 export default function ProxyPing({ accountId }: { accountId: string }) {
+  const t = useTranslations("proxy");
   const { data, isLoading, error, mutate } = useSWR<
     {
       ping: number;
@@ -31,10 +33,10 @@ export default function ProxyPing({ accountId }: { accountId: string }) {
             <ChevronsLeftRightEllipsis className="h-4 w-4 text-gray-500" />
             {isLoading && (
               <div className="h-6 w-14 animate-pulse rounded bg-gray-200 dark:bg-gray-700">
-                testing
+                {t("testingShort")}
               </div>
             )}
-            {!isLoading && error && <span>Failed</span>}
+            {!isLoading && error && <span>{t("failed")}</span>}
             {!isLoading && data && (
               <div className="flex h-6 items-center space-x-2">
                 <span className="text-sm">
@@ -45,7 +47,7 @@ export default function ProxyPing({ accountId }: { accountId: string }) {
           </div>
         </TooltipTrigger>
         <TooltipContent>
-          Current latency for accessing telegram API
+          {t("ping")}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

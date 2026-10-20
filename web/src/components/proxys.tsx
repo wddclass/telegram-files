@@ -35,6 +35,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { mutate } from "swr";
+import { useTranslations } from "next-intl";
 
 export interface ProxysProps {
   enableSelect?: boolean;
@@ -49,6 +50,8 @@ export default function Proxys({
   proxyName,
   onProxyNameChange,
 }: ProxysProps) {
+  const t = useTranslations("proxy");
+  const tc = useTranslations("common");
   const { settings, updateSettings } = useSettings();
   const [innerProxyName, setInnerProxyName] = useState(proxyName ?? "");
   const [isDialogOpen, setDialogOpen] = useState(false);
@@ -79,8 +82,8 @@ export default function Proxys({
           toast({
             variant: "success",
             description: innerProxyName
-              ? `Proxy is set to ${innerProxyName}`
-              : "Proxy is disabled",
+              ? t("setTo", { name: innerProxyName })
+              : t("disabledToast"),
           });
         },
       },
@@ -164,16 +167,16 @@ export default function Proxys({
     <div className="relative h-full">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <h1 className="text-2xl font-bold">Proxys</h1>
+          <h1 className="text-2xl font-bold">{t("title")}</h1>
           {telegramId && <ProxyPing accountId={telegramId} />}
         </div>
         <Button onClick={() => handleOpenDialog()}>
-          <Plus className="mr-2 h-5 w-5" /> Add Proxy
+          <Plus className="mr-2 h-5 w-5" /> {t("add")}
         </Button>
       </div>
       {proxys.length === 0 && (
         <div className="flex h-32 items-center justify-center">
-          <p className="text-center text-gray-500">No proxys added yet</p>
+          <p className="text-center text-gray-500">{t("empty")}</p>
         </div>
       )}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3 2xl:grid-cols-4">
@@ -235,7 +238,7 @@ export default function Proxys({
               variant="outline"
               type="button"
             >
-              Cancel
+              {tc("cancel")}
             </Button>
           </DialogClose>
           <Button
@@ -243,7 +246,7 @@ export default function Proxys({
             disabled={isToggleProxyMutating}
             onClick={() => handleProxySubmit()}
           >
-            Submit
+            {tc("submit")}
           </Button>
         </div>
       )}
@@ -252,7 +255,7 @@ export default function Proxys({
           <DialogHeader>
             <DialogTitle>
               <span className="mr-2">
-                {editingProxy ? "Edit Proxy" : "Add Proxy"}
+                {editingProxy ? t("edit") : t("addTitle")}
               </span>
               <ProxyParser onParsed={(proxy) => setFormState(proxy)} />
             </DialogTitle>
@@ -260,7 +263,7 @@ export default function Proxys({
           <div className="space-y-4">
             {/* Radio buttons for proxy type */}
             <div>
-              <Label className="mb-2 block">Type</Label>
+              <Label className="mb-2 block">{t("type")}</Label>
               <div className="flex space-x-4">
                 <label className="flex cursor-pointer items-center">
                   <input
@@ -316,80 +319,80 @@ export default function Proxys({
             </div>
 
             <div>
-              <Label className="mb-2 block">Name</Label>
+              <Label className="mb-2 block">{t("name")}</Label>
               <Input
                 name="name"
                 value={formState.name}
                 onChange={handleInputChange}
-                placeholder="Enter proxy name"
+                placeholder={t("namePlaceholder")}
               />
             </div>
             <div>
               <Label className="mb-2 block">
-                Proxy server address and port number
+                {t("serverPort")}
               </Label>
               <div className="flex space-x-4">
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-gray-500">
-                    Server
+                    {t("server")}
                   </label>
                   <Input
                     name="server"
                     value={formState.server}
                     onChange={handleInputChange}
-                    placeholder="Enter server address"
+                    placeholder={t("serverPlaceholder")}
                   />
                 </div>
                 <div className="w-24">
                   <label className="block text-xs font-medium text-gray-500">
-                    Port
+                    {t("port")}
                   </label>
                   <Input
                     name="port"
                     type="number"
                     value={formState.port}
                     onChange={handleInputChange}
-                    placeholder="Enter port number"
+                    placeholder={t("portPlaceholder")}
                   />
                 </div>
               </div>
             </div>
-            <Label className="mb-2 block">Authentication (optional)</Label>
+            <Label className="mb-2 block">{t("auth")}</Label>
             {formState.type === "mtproto" ? (
               <div>
                 <label className="block text-xs font-medium text-gray-500">
-                  Secret
+                  {t("secret")}
                 </label>
                 <Input
                   name="secret"
                   value={formState.secret}
                   onChange={handleInputChange}
-                  placeholder="Enter secret"
+                  placeholder={t("secretPlaceholder")}
                 />
               </div>
             ) : (
               <>
                 <div>
                   <label className="block text-xs font-medium text-gray-500">
-                    Username
+                    {t("username")}
                   </label>
                   <Input
                     name="username"
                     value={formState.username}
                     onChange={handleInputChange}
-                    placeholder="Enter username"
+                    placeholder={t("usernamePlaceholder")}
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500">
-                    Password
+                    {t("password")}
                   </label>
                   <Input
                     name="password"
                     type="password"
                     value={formState.password}
                     onChange={handleInputChange}
-                    placeholder="Enter password"
+                    placeholder={t("passwordPlaceholder")}
                   />
                 </div>
               </>
@@ -397,10 +400,10 @@ export default function Proxys({
           </div>
           <DialogFooter>
             <Button onClick={handleCloseDialog} variant="outline">
-              Cancel
+              {tc("cancel")}
             </Button>
             <Button onClick={handleSaveProxy}>
-              {editingProxy ? "Save" : "Add"}
+              {editingProxy ? tc("save") : tc("add")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -410,6 +413,7 @@ export default function Proxys({
 }
 
 function ProxyParser({ onParsed }: { onParsed: (proxys: Proxy) => void }) {
+  const t = useTranslations("proxy");
   const handleParseProxy = async () => {
     const clipboardText = await navigator.clipboard.readText();
     if (!clipboardText || clipboardText.trim().length === 0) {
@@ -419,13 +423,13 @@ function ProxyParser({ onParsed }: { onParsed: (proxys: Proxy) => void }) {
     if (proxy) {
       toast({
         variant: "success",
-        description: "Proxy string is parsed successfully",
+        description: t("parsed"),
       });
       onParsed(proxy);
     } else {
       toast({
         variant: "error",
-        description: "Invalid proxy string format",
+        description: t("invalid"),
       });
     }
   };
@@ -441,10 +445,10 @@ function ProxyParser({ onParsed }: { onParsed: (proxys: Proxy) => void }) {
         <TooltipContent>
           <div className="flex flex-col space-y-2 p-2">
             <p className="text-sm font-semibold">
-              Parse the proxy string from the clipboard and add them to the list
+              {t("parseTooltip")}
             </p>
             <p className="text-xs text-gray-500">
-              The proxy should be in the following format:
+              {t("parseFormat")}
               <br />
               <code>http://username:password@server:port</code>
               <br />

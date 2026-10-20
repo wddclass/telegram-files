@@ -1,6 +1,8 @@
 import * as React from "react";
 import { type CSSProperties, useEffect, useState } from "react";
 import { format } from "date-fns";
+import { useTranslations } from "next-intl";
+import { useDateFnsLocale } from "@/i18n/locale";
 import {
   ArrowDownNarrowWide,
   ArrowUpNarrowWide,
@@ -58,6 +60,7 @@ const SearchFilter = ({
   onChange: (search: string) => void;
 }) => {
   const [localSearch, setLocalSearch] = useState(search);
+  const t = useTranslations("filters");
 
   const handleChange = (value: string) => {
     setLocalSearch(value);
@@ -66,10 +69,10 @@ const SearchFilter = ({
 
   return (
     <div className="space-y-2">
-      <Label>Keyword</Label>
+      <Label>{t("keyword")}</Label>
       <div className="relative">
         <Input
-          placeholder="Search with name or caption"
+          placeholder={t("keywordPlaceholder")}
           value={localSearch}
           onChange={(e) => handleChange(e.target.value)}
         />
@@ -95,10 +98,11 @@ interface TagsFilterProps {
 
 const TagsFilter = ({ tags, onChange }: TagsFilterProps) => {
   const { settings } = useSettings();
+  const t = useTranslations("filters");
 
   return (
     <div className="space-y-2">
-      <Label>Tags</Label>
+      <Label>{t("tags")}</Label>
       <TagsSelector
         value={tags}
         onChangeAction={onChange}
@@ -117,6 +121,8 @@ interface DateFilterProps {
 const DateFilter = ({ dateType, dateRange, onChange }: DateFilterProps) => {
   const [open, setOpen] = useState(false);
   const isMobile = useIsMobile();
+  const t = useTranslations("filters");
+  const dateLocale = useDateFnsLocale();
   const [localType, setLocalType] = useState<"sent" | "downloaded">(
     dateType ?? "sent",
   );
@@ -147,16 +153,16 @@ const DateFilter = ({ dateType, dateRange, onChange }: DateFilterProps) => {
   };
 
   const getDisplayText = () => {
-    if (!dateRange?.[0] && !dateRange?.[1]) return "Select date range";
+    if (!dateRange?.[0] && !dateRange?.[1]) return t("selectRange");
     if (dateRange[0] && dateRange[1]) {
-      return `${format(new Date(dateRange[0]), "LLL dd, y")} - ${format(new Date(dateRange[1]), "LLL dd, y")}`;
+      return `${format(new Date(dateRange[0]), "PP", { locale: dateLocale })} - ${format(new Date(dateRange[1]), "PP", { locale: dateLocale })}`;
     }
-    return "Date range selected";
+    return t("rangeSelected");
   };
 
   return (
     <div className="space-y-2">
-      <Label>Date Filter</Label>
+      <Label>{t("date")}</Label>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -166,7 +172,7 @@ const DateFilter = ({ dateType, dateRange, onChange }: DateFilterProps) => {
             <CalendarRange className="mr-2 h-4 w-4" />
             <span className="flex-1">{getDisplayText()}</span>
             <span className="ml-2 rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">
-              {localType === "downloaded" ? "Download" : "Sent"}
+              {localType === "downloaded" ? t("downloaded") : t("sent")}
             </span>
           </Button>
         </PopoverTrigger>
@@ -183,7 +189,7 @@ const DateFilter = ({ dateType, dateRange, onChange }: DateFilterProps) => {
                 onClick={() => handleTypeChange("sent")}
                 className="flex-1"
               >
-                Sent Date
+                {t("sentDate")}
               </Button>
               <Button
                 size="sm"
@@ -191,11 +197,12 @@ const DateFilter = ({ dateType, dateRange, onChange }: DateFilterProps) => {
                 onClick={() => handleTypeChange("downloaded")}
                 className="flex-1"
               >
-                Downloaded
+                {t("downloadedDate")}
               </Button>
             </div>
             <div className="rounded-md border p-2">
               <Calendar
+                locale={dateLocale}
                 mode="range"
                 selected={{
                   from: localRange[0],
@@ -227,6 +234,7 @@ const SizeFilter = ({ sizeRange, sizeUnit, onChange }: SizeFilterProps) => {
   const [localUnit, setLocalUnit] = useState<"KB" | "MB" | "GB">(
     sizeUnit ?? "MB",
   );
+  const t = useTranslations("filters");
 
   const handleChange = (newValue: number[]) => {
     const range: [number, number] = [newValue[0]!, newValue[1]!];
@@ -242,7 +250,7 @@ const SizeFilter = ({ sizeRange, sizeUnit, onChange }: SizeFilterProps) => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Label>File Size Range</Label>
+        <Label>{t("sizeRange")}</Label>
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm">
@@ -313,17 +321,18 @@ interface SortFilterProps {
 const SortFilter = ({ sort, order, onChange }: SortFilterProps) => {
   const currentSort = sort ?? "date";
   const currentOrder = order ?? "desc";
+  const t = useTranslations("filters");
 
   const sortOptions = [
-    { value: "date", label: "Sent Date" },
-    { value: "completion_date", label: "Downloaded Date" },
-    { value: "size", label: "File Size" },
-    { value: "reaction_count", label: "Reaction Count" },
+    { value: "date", label: t("sentDate") },
+    { value: "completion_date", label: t("downloadedDate") },
+    { value: "size", label: t("fileSize") },
+    { value: "reaction_count", label: t("reactionCount") },
   ] as const;
 
   return (
     <div className="space-y-2">
-      <Label>Sort By</Label>
+      <Label>{t("sortBy")}</Label>
       <div className="flex gap-2">
         <Select
           value={currentSort}
@@ -380,6 +389,7 @@ export default function FileFilters({
   const [localFilters, setLocalFilters] = useState<FileFilter>(filters);
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
+  const t = useTranslations("filters");
 
   useEffect(() => {
     setLocalFilters(filters);
@@ -459,7 +469,7 @@ export default function FileFilters({
           className={cn("relative gap-2", isMobile && "z-50 w-11 h-11") }
         >
           <Filter />
-          {!isMobile && "Filters"}
+          {!isMobile && t("button")}
           {filterCount > 0 && (
             <span className="absolute left-0 top-0 -ml-1 -mt-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs text-white">
               {filterCount}
@@ -489,7 +499,7 @@ export default function FileFilters({
               <DrawerTitle>
                 <div className="flex items-center justify-between">
                   <span className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-                    Filters
+                    {t("title")}
                   </span>
                   {!noAccountSpecified && (
                     <div className="flex items-center space-x-2">
@@ -497,7 +507,7 @@ export default function FileFilters({
                         htmlFor="offline"
                         className="cursor-pointer text-zinc-500"
                       >
-                        Offline
+                        {t("offline")}
                       </Label>
                       <Switch
                         id="offline"
@@ -514,8 +524,7 @@ export default function FileFilters({
                 </div>
               </DrawerTitle>
               <DrawerDescription className="mb-3">
-                Default search by Telegram Client, you can choose offline to
-                search by local database.
+                {t("offlineHint")}
               </DrawerDescription>
 
               <div className="space-y-4 overflow-y-auto p-0.5">
@@ -534,7 +543,7 @@ export default function FileFilters({
 
                 {!localFilters.offline && (
                   <div className="flex items-center justify-between rounded-md border bg-gray-100/50 px-2 py-3 dark:bg-gray-600/50">
-                    <Label htmlFor="notDownload">Filter Not Download</Label>
+                    <Label htmlFor="notDownload">{t("notDownload")}</Label>
                     <Switch
                       id="notDownload"
                       checked={localFilters.downloadStatus === "idle"}
@@ -544,7 +553,7 @@ export default function FileFilters({
                           downloadStatus: checked ? "idle" : undefined,
                         }));
                       }}
-                      aria-label="Not Download"
+                      aria-label={t("notDownload")}
                     />
                   </div>
                 )}
@@ -585,9 +594,9 @@ export default function FileFilters({
             </div>
 
             <DrawerFooter className="fixed bottom-0 left-0 right-0 bg-background">
-              <Button onClick={handleApply}>Apply Filters</Button>
+              <Button onClick={handleApply}>{t("apply")}</Button>
               <Button variant="outline" onClick={handleClear}>
-                Clear Filters
+                {t("clear")}
               </Button>
             </DrawerFooter>
           </div>

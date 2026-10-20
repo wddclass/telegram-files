@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { toast } from "@/hooks/use-toast";
+import { useTranslations } from "next-intl";
 import type { TelegramFile } from "@/lib/types";
 
 type FileSwitchProps = {
@@ -15,6 +16,7 @@ export default function useFileSwitch({
   hasMore,
   handleLoadMore,
 }: FileSwitchProps) {
+  const t = useTranslations("files");
   const [direction, setDirection] = useState(0);
 
   const handleNavigation = useCallback(
@@ -29,12 +31,12 @@ export default function useFileSwitch({
         } else {
           toast({
             variant: "info",
-            description: "No more files to load",
+            description: t("noMore"),
           });
         }
       }
     },
-    [file?.next, file?.prev, onFileChange, hasMore, handleLoadMore],
+    [file?.next, file?.prev, onFileChange, hasMore, handleLoadMore, t],
   );
 
   return {

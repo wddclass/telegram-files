@@ -21,6 +21,7 @@ import prettyBytes from "pretty-bytes";
 import { Card, CardContent } from "./ui/card";
 import { useRouter } from "next/navigation";
 import useIsMobile from "@/hooks/use-is-mobile";
+import { useTranslations } from "next-intl";
 
 interface EmptyStateProps {
   isLoadingAccount?: boolean;
@@ -38,14 +39,14 @@ export function EmptyState({
   onSelectAccount,
 }: EmptyStateProps) {
   const isMobile = useIsMobile();
+  const t = useTranslations("empty");
   if (message) {
     return (
       <div className="flex flex-col items-center">
         <MessageSquare className="mb-4 h-16 w-16 text-muted-foreground" />
         <h2 className="mb-2 text-2xl font-semibold">{message}</h2>
         <p className="text-muted-foreground">
-          Choose a chat from the dropdown menu above to view and manage its
-          files.
+          {t("chooseChat")}
         </p>
       </div>
     );
@@ -60,11 +61,10 @@ export function EmptyState({
             {!isMobile && (
               <>
                 <h2 className="mb-2 text-2xl font-semibold">
-                  Select an Account
+                  {t("selectAccount")}
                 </h2>
                 <p className="mb-4 max-w-md text-muted-foreground">
-                  Choose a Telegram account to view and manage your files. You
-                  can add more accounts using the button below.
+                  {t("selectAccountHint")}
                 </p>
               </>
             )}
@@ -72,10 +72,9 @@ export function EmptyState({
         ) : (
           <>
             <TelegramIcon className="mb-4 h-16 w-16 text-muted-foreground" />
-            <h2 className="mb-2 text-2xl font-semibold">No Accounts Found</h2>
+            <h2 className="mb-2 text-2xl font-semibold">{t("noAccounts")}</h2>
             <p className="mb-4 max-w-md text-muted-foreground">
-              Add a Telegram account to start managing your files. You can add
-              multiple accounts and switch between them.
+              {t("noAccountsHint")}
             </p>
           </>
         )}
@@ -85,7 +84,7 @@ export function EmptyState({
               <BorderBeam size={60} duration={12} delay={9} />
               <Button variant="outline">
                 <UserPlus className="mr-2 h-4 w-4" />
-                Add Account
+                {t("addAccount")}
               </Button>
             </div>
           </AccountDialog>
@@ -120,13 +119,14 @@ function AllFiles() {
   const router = useRouter();
   const { data, error, isLoading } = useSWR<FileCount, Error>(`/files/count`);
   const isMobile = useIsMobile();
+  const t = useTranslations("empty");
 
   if (error) {
     return (
       <Card className="mx-auto mb-8 max-w-5xl">
         <CardContent className="flex items-center justify-center p-6 text-red-500">
           <AlertTriangle className="mr-2" />
-          Failed to load file counts
+          {t("loadCountsFailed")}
         </CardContent>
       </Card>
     );
@@ -137,7 +137,7 @@ function AllFiles() {
       <Card className="mx-auto mb-8 max-w-5xl">
         <CardContent className="flex items-center justify-center p-6 text-gray-500">
           <Loader2 className="mr-2 animate-spin" />
-          Loading file counts...
+          {t("loadingCounts")}
         </CardContent>
       </Card>
     );
@@ -153,21 +153,21 @@ function AllFiles() {
           <div className="flex items-center justify-center gap-3 rounded-lg bg-gray-100 p-3 dark:bg-gray-800">
             <Check className="text-green-500" />
             <span className="hidden text-sm font-medium md:inline-block">
-              Downloaded
+              {t("downloaded")}
             </span>
             <span className="text-sm font-medium">{data.completed}</span>
           </div>
           <div className="flex items-center justify-center gap-3 rounded-lg bg-gray-100 p-3 dark:bg-gray-800">
             <Download className="text-blue-500" />
             <span className="hidden text-sm font-medium md:inline-block">
-              Downloading
+              {t("downloading")}
             </span>
             <span className="text-sm font-medium">{data.downloading}</span>
           </div>
           <div className="flex items-center justify-center gap-3 rounded-lg bg-gray-100 p-3 dark:bg-gray-800">
             <HardDrive className="text-purple-500" />
             <span className="hidden text-sm font-medium md:inline-block">
-              Size
+              {t("size")}
             </span>
             <span className="text-sm font-medium">
               {prettyBytes(data.downloadedSize)}

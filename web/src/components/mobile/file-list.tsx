@@ -12,6 +12,7 @@ import DraggableElement from "@/components/ui/draggable-element";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import FileNotFount from "@/components/file-not-found";
 import { MobileFileTagsDrawer } from "@/components/file-tags";
+import { useTranslations } from "next-intl";
 
 interface FileListProps {
   accountId: string;
@@ -20,6 +21,7 @@ interface FileListProps {
 }
 
 export default function FileList({ accountId, chatId, link }: FileListProps) {
+  const t = useTranslations("empty");
   const useFilesProps = useFiles(accountId, chatId, undefined, link);
   const [currentViewFile, setCurrentViewFile] = useState<
     TelegramFile | undefined
@@ -171,7 +173,7 @@ export default function FileList({ accountId, chatId, link }: FileListProps) {
                       style={{ strokeWidth: "0.8px" }}
                     />
                   ) : (
-                    <p className="text-muted-foreground">No more files</p>
+                    <p className="text-muted-foreground">{t("noMoreFiles")}</p>
                   )}
                 </div>
               );

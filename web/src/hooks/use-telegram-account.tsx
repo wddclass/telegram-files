@@ -7,6 +7,7 @@ import type { TelegramAccount } from "@/lib/types";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 import { POST } from "@/lib/api";
+import { useTranslations } from "next-intl";
 
 interface TelegramAccountContextType {
   isLoading: boolean;
@@ -35,6 +36,7 @@ export const TelegramAccountProvider: React.FC<
   } = useSWR<TelegramAccount[]>(`/telegrams`);
   const router = useRouter();
   const { toast } = useToast();
+  const t = useTranslations("accounts");
   const searchParams = useSearchParams();
   const routerAccountId = searchParams.get("id") ?? undefined;
   const [accountId, setAccountId] = useState<string | undefined>(
@@ -74,8 +76,10 @@ export const TelegramAccountProvider: React.FC<
     if (account.status === "active") {
       toast({
         variant: "info",
-        title: "Account Changed",
-        description: `Switched to ${accounts?.find((a) => a.id === newAccountId)?.name}'s account`,
+        title: t("changed"),
+        description: t("switched", {
+          name: accounts?.find((a) => a.id === newAccountId)?.name ?? "",
+        }),
       });
       router.push(`/accounts?id=${newAccountId}`);
     }

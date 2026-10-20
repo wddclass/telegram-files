@@ -21,6 +21,8 @@ import FileViewer from "@/components/file-viewer";
 import FileFilters from "./file-filters";
 import { Badge } from "@/components/ui/badge";
 import FileBatchControl from "@/components/file-batch-control";
+import { useTranslations } from "next-intl";
+import { isFileTypeKey } from "@/i18n/labels";
 
 const COLUMNS: Column[] = [
   {
@@ -76,6 +78,9 @@ export function FileTable({
   link,
 }: FileTableProps) {
   const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set());
+  const t = useTranslations("files");
+  const tCol = useTranslations("columns");
+  const tType = useTranslations("fileType");
   const tableParentRef = useRef(null);
   const [columns, setColumns] = useState<Column[]>(COLUMNS);
   const [rowHeight, setRowHeight] = useRowHeightLocalStorage(
@@ -198,7 +203,7 @@ export function FileTable({
               }}
             >
               <SquareChevronLeft className="h-4 w-4" />
-              Back
+              {t("back")}
             </Button>
           )}
           {link ? (
@@ -209,7 +214,9 @@ export function FileTable({
           ) : (
             <>
               <Badge variant="outline" className="flex h-full bg-accent">
-                {filters.type.charAt(0).toUpperCase() + filters.type.slice(1)}
+                {isFileTypeKey(filters.type)
+                  ? tType(filters.type)
+                  : filters.type}
               </Badge>
               <FileFilters
                 telegramId={accountId}
@@ -270,7 +277,7 @@ export function FileTable({
                     col.id === "content" ? dynamicClass.contentCell : "",
                   )}
                 >
-                  {col.label}
+                  {tCol(col.id)}
                 </div>
               ) : null,
             )}

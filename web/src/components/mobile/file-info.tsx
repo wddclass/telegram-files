@@ -21,6 +21,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import prettyBytes from "pretty-bytes";
 import { formatDistanceToNow } from "date-fns";
+import { useTranslations } from "next-intl";
+import { useDateFnsLocale } from "@/i18n/locale";
+import { isFileTypeKey } from "@/i18n/labels";
 import { Button } from "@/components/ui/button";
 import { MobileFileControl } from "@/components/file-control";
 import React from "react";
@@ -43,6 +46,11 @@ export default function FileInfo({
   onFileTagsClick: (file: TelegramFile) => void;
 }) {
   const { downloadProgress } = useFileSpeed(file);
+  const t = useTranslations("time");
+  const tFiles = useTranslations("files");
+  const tCol = useTranslations("columns");
+  const tType = useTranslations("fileType");
+  const dateLocale = useDateFnsLocale();
   return (
     <>
       <DrawerHeader className="text-center">
@@ -95,17 +103,17 @@ export default function FileInfo({
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Type className="h-4 w-4" />
-                  <span>Type</span>
+                  <span>{tCol("type")}</span>
                 </div>
                 <Badge variant="secondary" className="text-xs">
-                  {file.type}
+                  {isFileTypeKey(file.type) ? tType(file.type) : file.type}
                 </Badge>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <HardDrive className="h-4 w-4" />
-                  <span>Size</span>
+                  <span>{tCol("size")}</span>
                 </div>
                 <Badge variant="secondary" className="text-xs">
                   {prettyBytes(file.size)}
@@ -115,11 +123,12 @@ export default function FileInfo({
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Calendar className="h-4 w-4" />
-                  <span>Received At</span>
+                  <span>{t("messageReceived")}</span>
                 </div>
                 <Badge variant="secondary" className="text-xs">
                   {formatDistanceToNow(new Date(file.date * 1000), {
                     addSuffix: true,
+                    locale: dateLocale,
                   })}
                 </Badge>
               </div>
@@ -127,7 +136,7 @@ export default function FileInfo({
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Download className="h-4 w-4" />
-                  <span>Downloaded Size</span>
+                  <span>{t("downloadedSize")}</span>
                 </div>
                 <Badge variant="secondary" className="text-xs">
                   {prettyBytes(file.downloadedSize)}
@@ -138,11 +147,12 @@ export default function FileInfo({
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock10 className="h-4 w-4" />
-                    <span>Download At</span>
+                    <span>{t("downloadAt")}</span>
                   </div>
                   <Badge variant="secondary" className="text-xs">
                     {formatDistanceToNow(new Date(file.startDate), {
                       addSuffix: true,
+                      locale: dateLocale,
                     })}
                   </Badge>
                 </div>
@@ -152,11 +162,12 @@ export default function FileInfo({
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <ClockArrowDown className="h-4 w-4" />
-                    <span>Completion At</span>
+                    <span>{t("completionAt")}</span>
                   </div>
                   <Badge variant="secondary" className="text-xs">
                     {formatDistanceToNow(new Date(file.completionDate), {
                       addSuffix: true,
+                      locale: dateLocale,
                     })}
                   </Badge>
                 </div>
@@ -171,7 +182,7 @@ export default function FileInfo({
           (file.type === "video" || file.type === "photo") && (
             <Button className="w-full" onClick={onView}>
               <View className="h-4 w-4" />
-              <span>View</span>
+              <span>{tFiles("view")}</span>
             </Button>
           )}
         <MobileFileControl file={file} />

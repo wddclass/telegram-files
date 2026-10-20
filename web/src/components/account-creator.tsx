@@ -32,6 +32,7 @@ import TGDuck16Plane from "@/components/animations/tg-duck16_plane.json";
 import TGQRPlane from "@/components/animations/tg-qr-plane.json";
 import dynamic from "next/dynamic";
 import QRCodeStyling, { type Options } from "qr-code-styling";
+import { useTranslations } from "next-intl";
 
 interface AccountCreatorProps {
   isAdd?: boolean;
@@ -49,6 +50,8 @@ export default function AccountCreator({
   onLoginSuccess,
 }: AccountCreatorProps) {
   const { triggerMethod, isMethodExecuting } = useTelegramMethod();
+  const t = useTranslations("accounts");
+  const tCommon = useTranslations("common");
   const { toast } = useToast();
   const { mutate } = useSWRConfig();
   const { lastJsonMessage } = useWebsocket();
@@ -102,7 +105,7 @@ export default function AccountCreator({
         case TelegramConstructor.STATE_READY:
           toast({
             variant: "success",
-            description: "Account added successfully",
+            description: t("added"),
           });
           setTimeout(() => {
             void mutate("/telegrams");
@@ -119,7 +122,7 @@ export default function AccountCreator({
           console.log("Unknown telegram constructor:", state.constructor);
       }
     },
-    [mutate, onLoginSuccess, toast],
+    [mutate, onLoginSuccess, t, toast],
   );
 
   useEffect(() => {
@@ -157,7 +160,7 @@ export default function AccountCreator({
   if (debounceIsCreateMutating) {
     return (
       <div className="flex items-center justify-center space-x-2 text-xl">
-        <span>Initializing account, please wait</span>
+        <span>{t("initializing")}</span>
         <Ellipsis className="h-4 w-4 animate-pulse" />
       </div>
     );
@@ -167,7 +170,7 @@ export default function AccountCreator({
     return (
       <div className="text-center text-xl">
         <span className="mr-3 text-3xl">😲</span>
-        Initializing account failed, please try again later.
+        {t("initFailed")}
       </div>
     );
   }
@@ -190,7 +193,7 @@ export default function AccountCreator({
             });
           }}
         >
-          Start Initialization
+          {t("startInit")}
         </Button>
       </div>
     );
@@ -199,8 +202,8 @@ export default function AccountCreator({
   if (!authState && !isMethodExecuting) {
     return (
       <div className="flex flex-col items-center justify-center space-y-2 rounded bg-gray-50 p-2">
-        <p>Waiting for the telegram account to be initialized, please wait.</p>
-        <p>If it takes too long, please refresh the page or try again later.</p>
+        <p>{t("waiting")}</p>
+        <p>{t("waitingLong")}</p>
         <Ellipsis className="h-4 w-4 animate-pulse" />
       </div>
     );
@@ -209,10 +212,8 @@ export default function AccountCreator({
   const authStateFormFields = {
     [TelegramConstructor.WAIT_PHONE_NUMBER]: (
       <div className="space-y-2">
-        <Label htmlFor="phone">Phone Number</Label>
-        <p className="text-xs text-gray-500">
-          Should with country code like: 8613712345678
-        </p>
+        <Label htmlFor="phone">{t("phone")}</Label>
+        <p className="text-xs text-gray-500">{t("phoneHint")}</p>
         <Input
           id="phone"
           value={phoneNumber}
@@ -227,10 +228,8 @@ export default function AccountCreator({
     ),
     [TelegramConstructor.WAIT_CODE]: (
       <div className="space-y-2">
-        <Label htmlFor="code">Authentication Code</Label>
-        <p className="text-xs text-gray-500">
-          Please enter the code sent to your telegram account.
-        </p>
+        <Label htmlFor="code">{t("code")}</Label>
+        <p className="text-xs text-gray-500">{t("codeHint")}</p>
         <InputOTP
           id="code"
           maxLength={6}
@@ -252,10 +251,8 @@ export default function AccountCreator({
     ),
     [TelegramConstructor.WAIT_PASSWORD]: (
       <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <p className="text-xs text-gray-500">
-          You have enabled two-step verification, please enter your password.
-        </p>
+        <Label htmlFor="password">{t("password")}</Label>
+        <p className="text-xs text-gray-500">{t("passwordHint")}</p>
         <Input
           id="password"
           type="password"
@@ -265,21 +262,17 @@ export default function AccountCreator({
           required
         />
         <p className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400">
-          Using passkeys instead of a password? Close this dialog, start over,
-          and use the <strong>LOG IN BY QR CODE</strong> option to authenticate
-          from an existing Telegram device.
+          {t("passkeyHint")}
         </p>
       </div>
     ),
     [TelegramConstructor.WAIT_PREMIUM_PURCHASE]: (
       <div className="space-y-2 rounded border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950">
         <p className="font-medium text-red-700 dark:text-red-400">
-          Telegram Premium Required
+          {t("premiumTitle")}
         </p>
         <p className="text-xs text-red-600 dark:text-red-500">
-          This account requires an active Telegram Premium subscription to log
-          in. Please purchase Telegram Premium in the official Telegram app and
-          try again.
+          {t("premiumHint")}
         </p>
       </div>
     ),
@@ -336,7 +329,7 @@ export default function AccountCreator({
               {isDeMethodExecuting ? (
                 <LoaderCircle className="h-4 w-4 animate-spin" />
               ) : (
-                "🚀 Submit"
+                tCommon("submit")
               )}
             </Button>
           )}
@@ -350,7 +343,7 @@ export default function AccountCreator({
               {isDeMethodExecuting ? (
                 <LoaderCircle className="h-4 w-4 animate-spin" />
               ) : (
-                "LOG IN BY QR CODE"
+                t("qrLogin")
               )}
             </Button>
           )}
@@ -382,6 +375,7 @@ const options: Options = {
 };
 
 function QRCode({ link }: { link?: string }) {
+  const t = useTranslations("accounts");
   const [qrCode, setQrCode] = useState<QRCodeStyling>();
   const ref = useRef<HTMLDivElement>(null);
 
@@ -427,7 +421,7 @@ function QRCode({ link }: { link?: string }) {
       </div>
       <div className="rounded-lg bg-white bg-opacity-80 p-1 dark:bg-gray-800">
         <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-          Scan the QR code with your telegram app to log in.
+          {t("qrHint")}
         </p>
       </div>
     </div>

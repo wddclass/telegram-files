@@ -14,6 +14,7 @@ import FileImage from "./file-image";
 import FileTags from "@/components/file-tags";
 import { Badge } from "@/components/ui/badge";
 import { TooltipWrapper } from "@/components/ui/tooltip";
+import { useTranslations } from "next-intl";
 
 type FileRowProps = {
   index: number;
@@ -53,6 +54,7 @@ export default function FileRow({
   const { rowHeight, dynamicClass, columns } = properties;
   const { downloadProgress, downloadSpeed } = useFileSpeed(file);
   const [hovered, setHovered] = useState(false);
+  const t = useTranslations("status");
 
   const columnRenders: Record<string, ReactNode> = {
     content: (
@@ -61,7 +63,7 @@ export default function FileRow({
         onClick={onFileClick}
       >
         {file.reactionCount > 0 && (
-          <TooltipWrapper content="Reaction Count">
+          <TooltipWrapper content={t("reactionCount")}>
             <Badge className="absolute -left-1 -top-1.5 z-10 flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-blue-500 text-sm hover:bg-blue-600">
               {file.reactionCount}
             </Badge>

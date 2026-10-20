@@ -17,6 +17,7 @@ import FileExtra from "@/components/file-extra";
 import { Button } from "@/components/ui/button";
 import useFileSwitch from "@/hooks/use-file-switch";
 import FileImage from "./file-image";
+import { useTranslations } from "next-intl";
 
 type FileViewerProps = {
   open: boolean;
@@ -34,6 +35,7 @@ export default function FileViewer({
   handleLoadMore,
   isLoading,
 }: FileViewerProps) {
+  const t = useTranslations("files");
   const { handleNavigation, direction } = useFileSwitch({
     file,
     onFileChange,
@@ -152,7 +154,7 @@ export default function FileViewer({
                 }}
               >
                 <VisuallyHidden>
-                  <DialogTitle>File Viewer</DialogTitle>
+                  <DialogTitle>{t("viewer")}</DialogTitle>
                 </VisuallyHidden>
                 {file.type === "video" &&
                 file.downloadStatus === "completed" ? (

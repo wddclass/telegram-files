@@ -4,6 +4,7 @@ import * as React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 type TagsSelectorProps = {
   value: string[];
@@ -17,6 +18,7 @@ export function TagsSelector({
   tags,
 }: TagsSelectorProps) {
   const [selectedTags, setSelectedTags] = useState<string[]>(value);
+  const t = useTranslations("tags");
   const selectedsContainerRef = useRef<HTMLDivElement>(null);
 
   const removeSelectedTag = (tag: string) => {
@@ -53,7 +55,7 @@ export function TagsSelector({
   return (
     <div className="flex w-full max-w-lg flex-col">
       <span className="mb-2 border-b py-1 text-xs text-gray-700 dark:text-gray-200">
-        Selected Tags
+        {t("selected")}
       </span>
       <motion.div
         className="no-scrollbar mb-3 flex max-h-32 w-full flex-wrap items-center justify-start gap-3 overflow-auto p-1 md:gap-1.5"
@@ -65,7 +67,7 @@ export function TagsSelector({
             className="flex w-full items-center justify-center rounded-md bg-gray-100 p-2 text-sm text-gray-500 dark:bg-gray-700"
             layoutId="empty-tag"
           >
-            No tags selected
+            {t("noneSelected")}
           </motion.div>
         )}
         {selectedTags.map((tag) => (
@@ -90,7 +92,7 @@ export function TagsSelector({
         ))}
       </motion.div>
       <span className="mb-2 border-b py-1 text-xs text-gray-700 dark:text-gray-200">
-        Optional Tags
+        {t("optional")}
       </span>
       {optionalTags.length > 0 && (
         <motion.div className="w-full p-1" layout>

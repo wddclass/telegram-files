@@ -7,6 +7,7 @@ import { Spoiler } from "spoiled";
 import AccountDeleteDialog from "@/components/account-delete-dialog";
 import { AccountDialog } from "@/components/account-dialog";
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 
 interface AccountListProps {
   accounts: TelegramAccount[];
@@ -14,6 +15,7 @@ interface AccountListProps {
 }
 
 export function AccountList({ accounts, onSelectAccount }: AccountListProps) {
+  const t = useTranslations("accounts");
   return (
     <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
       {accounts.map((account) => (
@@ -45,7 +47,7 @@ export function AccountList({ accounts, onSelectAccount }: AccountListProps) {
                     <Circle
                       className={`mr-1 h-2 w-2 ${account.status === "active" ? "text-green-500" : "text-gray-500"}`}
                     />
-                    {account.status}
+                    {account.status === "active" ? t("active") : t("inactive")}
                   </Badge>
                 </div>
                 {account.status === "active" && (
@@ -57,7 +59,7 @@ export function AccountList({ accounts, onSelectAccount }: AccountListProps) {
                 {account.status === "inactive" && (
                   <AccountDialog>
                     <Button variant="outline" size="sm">
-                      Activate
+                      {t("activate")}
                     </Button>
                   </AccountDialog>
                 )}

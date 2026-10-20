@@ -10,6 +10,7 @@ import FileInfo from "@/components/mobile/file-info";
 import { type useFiles } from "@/hooks/use-files";
 import useFileSwitch from "@/hooks/use-file-switch";
 import FileImage from "../file-image";
+import { useTranslations } from "next-intl";
 
 type FileDrawerProps = {
   open: boolean;
@@ -30,6 +31,7 @@ export default function FileDrawer({
   isLoading,
 }: FileDrawerProps) {
   const [viewing, setViewing] = useState(false);
+  const t = useTranslations("files");
 
   // 防止在下载状态变化时意外调用onFileChange导致drawer关闭
   const handleFileChange = (newFile: TelegramFile) => {
@@ -130,7 +132,7 @@ export default function FileDrawer({
         aria-describedby={undefined}
       >
         <VisuallyHidden>
-          <DrawerTitle>File Details</DrawerTitle>
+          <DrawerTitle>{t("details")}</DrawerTitle>
         </VisuallyHidden>
         {isLoading && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center">

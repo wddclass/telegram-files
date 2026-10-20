@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { ChevronDown, Columns, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 export type Column = {
   id: string;
@@ -33,12 +34,12 @@ type SortableItemProps = {
 
 function SortableItem({
   id,
-  label,
   onToggleVisibility,
   isVisible,
 }: SortableItemProps) {
   const { attributes, isDragging, listeners, setNodeRef, transform } =
     useSortable({ id });
+  const t = useTranslations("columns");
 
   return (
     <DropdownMenuCheckboxItem
@@ -56,14 +57,14 @@ function SortableItem({
       }}
     >
       <div className="mr-1">
-        <span className="capitalize">{label}</span>
+        <span>{t(id)}</span>
       </div>
       <Button
         {...attributes}
         {...listeners}
         variant="ghost"
         size="sm"
-        title="Drag and drop to reorder columns"
+        title={t("reorder")}
         className="invisible ml-auto group-hover:visible"
       >
         <Menu className="h-3 w-3" />
@@ -81,6 +82,7 @@ export default function TableColumnFilter({
   columns,
   onColumnConfigChange,
 }: TableColumnFilterProps) {
+  const t = useTranslations("columns");
   const [isOpen, setIsOpen] = useState(false);
   const [columnConfig, setColumnConfig] = useState<Column[]>(columns);
 
@@ -116,7 +118,7 @@ export default function TableColumnFilter({
         className="select-none"
         asChild
       >
-        <Button variant="outline" title="Show/hide columns">
+        <Button variant="outline" title={t("showHide")}>
           <Columns className="mr-2 h-4 w-4" />
           <span className="text-xs text-muted-foreground">{`(${columnConfig.length}/${columns.length})`}</span>
           <ChevronDown className="ml-2 h-4 w-4" />

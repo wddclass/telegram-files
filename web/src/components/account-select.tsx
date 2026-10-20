@@ -8,6 +8,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Ellipsis } from "lucide-react";
 import { type useTelegramAccount } from "@/hooks/use-telegram-account";
+import { useTranslations } from "next-intl";
 
 type AccountSelectProps = ReturnType<typeof useTelegramAccount>;
 
@@ -19,11 +20,12 @@ export default function AccountSelect({
   handleAccountChange,
 }: AccountSelectProps) {
   const accounts = getAccounts("active");
+  const t = useTranslations("accounts");
 
   return (
     <Select value={accountId} onValueChange={handleAccountChange}>
       <SelectTrigger className="w-full md:w-[200px]">
-        <SelectValue placeholder="Select account ...">
+        <SelectValue placeholder={t("select")}>
           {account ? (
             <div className="flex items-center gap-2">
               <Avatar className="h-6 w-6">
@@ -35,7 +37,7 @@ export default function AccountSelect({
               </span>
             </div>
           ) : (
-            `Select account ...`
+            t("select")
           )}
         </SelectValue>
       </SelectTrigger>

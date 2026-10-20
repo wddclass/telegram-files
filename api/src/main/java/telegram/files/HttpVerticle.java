@@ -139,7 +139,14 @@ public class HttpVerticle extends AbstractVerticle {
 
         router.get("/").handler(ctx -> ctx.response().end("Hello World!"));
         router.get("/health").handler(HealthCheckHandler.createWithHealthChecks(hc));
-        router.get("/version").handler(ctx -> ctx.json(new JsonObject().put("version", Start.VERSION)));
+        router.get("/version").handler(ctx -> ctx.json(new JsonObject()
+                .put("version", BuildInfo.VERSION)
+                .put("commit", BuildInfo.GIT_COMMIT_SHORT)
+                .put("commitFull", BuildInfo.GIT_COMMIT)
+                .put("ref", BuildInfo.GIT_REF)
+                .put("image", BuildInfo.IMAGE)
+                .put("repository", BuildInfo.REPOSITORY)
+                .put("branch", BuildInfo.BRANCH)));
         router.route("/ws").handler(this::handleWebSocket);
 
         router.get("/settings").handler(this::handleSettings);

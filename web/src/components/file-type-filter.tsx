@@ -11,6 +11,8 @@ import { Ellipsis } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import * as React from "react";
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
+import { isFileTypeKey } from "@/i18n/labels";
 
 interface FileTypeFilterProps {
   offline: boolean;
@@ -32,11 +34,12 @@ const FileTypeSelectItem = ({
   counts,
   isLoading,
 }: FileTypeSelectItemProps) => {
+  const t = useTranslations("fileType");
   return (
     <SelectItem value={value}>
       <div className="flex items-center gap-5">
         <span className="w-10">
-          {value.charAt(0).toUpperCase() + value.slice(1)}
+          {isFileTypeKey(value) ? t(value) : value}
         </span>
         {isLoading ? (
           <Ellipsis className="h-4 w-4 animate-pulse" />
@@ -58,6 +61,8 @@ export default function FileTypeFilter({
   onChange,
 }: FileTypeFilterProps) {
   const [localType, setLocalType] = React.useState<FileType | "all">(type);
+  const t = useTranslations("filters");
+  const tType = useTranslations("fileType");
   const { data: counts, isLoading } = useSWR<Record<FileType, number>>(
     `/telegram/${telegramId}/chat/${chatId}/files/count?offline=${offline}`,
   );
@@ -76,13 +81,13 @@ export default function FileTypeFilter({
 
   return (
     <div className="space-y-2">
-      <Label>Type</Label>
+      <Label>{t("type")}</Label>
       <Select value={localType} onValueChange={handleTypeChange}>
         <SelectTrigger>
-          <SelectValue placeholder="File type" />
+          <SelectValue placeholder={t("typePlaceholder")} />
         </SelectTrigger>
         <SelectContent>
-          {offline && <SelectItem value="all">All Files</SelectItem>}
+          {offline && <SelectItem value="all">{tType("all")}</SelectItem>}
           <FileTypeSelectItem
             value="media"
             counts={counts}

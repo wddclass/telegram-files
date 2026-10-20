@@ -11,6 +11,7 @@ import {
 import SpoiledWrapper from "@/components/spoiled-wrapper";
 import { cn } from "@/lib/utils";
 import { getApiUrl } from "@/lib/api";
+import { useTranslations } from "next-intl";
 
 const ImageErrorFallback = ({
   size = "s",
@@ -78,6 +79,7 @@ export default function FilePreview({
   isGalleryLayout?: boolean;
   className?: string;
 }) {
+  const t = useTranslations("files");
   const [viewportHeight, setViewportHeight] = useState(
     isFullPreview ? window.innerHeight : 288,
   );
@@ -135,7 +137,7 @@ export default function FilePreview({
           src={src}
           unoptimized={true}
           blurDataURL={`data:image/jpeg;base64,${file.thumbnail}`}
-          alt={file.fileName ?? "File Image"}
+          alt={file.fileName ?? t("imageAlt")}
           width={calculatedWidth}
           height={calculatedHeight}
           className={imageClasses}
