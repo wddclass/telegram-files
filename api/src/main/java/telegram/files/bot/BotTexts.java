@@ -191,6 +191,14 @@ public final class BotTexts {
         return chinese ? esc(action) + "失败：" + esc(detail) : esc(action) + " failed: " + esc(detail);
     }
 
+    public String suppressed(int count) {
+        int n = Math.max(count, 1);
+        if (chinese) {
+            return "发送过快，已合并 " + n + " 条未逐条发出的消息。发送 /downloads 或 /uploads 可查看当前进度。";
+        }
+        return "Sending too fast; " + n + " messages were combined instead of sent one by one. Use /downloads or /uploads for the current progress.";
+    }
+
     public String status(List<BotAccount> accounts) {
         if (accounts == null || accounts.isEmpty()) {
             return chinese ? "还没有 Telegram 账号。" : "No Telegram accounts yet.";

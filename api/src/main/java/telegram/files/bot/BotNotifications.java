@@ -2,6 +2,7 @@ package telegram.files.bot;
 
 import io.vertx.core.json.JsonObject;
 
+import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -45,5 +46,23 @@ public final class BotNotifications {
             return Optional.of(new Notice(Kind.DOWNLOAD_FAIL, uniqueId, data.getString("error")));
         }
         return Optional.empty();
+    }
+
+    /**
+     * Failures caused by a logged-out or unauthorized Telegram account. These are not announced per file.
+     */
+    public static boolean inactiveAccount(String error) {
+        if (error == null || error.isBlank()) {
+            return false;
+        }
+        String text = error.toLowerCase(Locale.ROOT);
+        return text.contains("未授权")
+                || text.contains("unauthorized")
+                || text.contains("not authorized")
+                || text.contains("logged out")
+                || text.contains("logged_out")
+                || text.contains("auth_key")
+                || text.contains("session_revoked")
+                || text.contains("user_deactivated");
     }
 }
