@@ -830,4 +830,36 @@ public class FileRepositoryImpl extends AbstractSqlRepository implements FileRep
                 .map(IterUtil::toList)
                 .onFailure(err -> log.error("Failed to list pending rclone uploads: %s".formatted(err.getMessage())));
     }
+
+    @Override
+    public Future<Integer> countRcloneStatus(String status) {
+        return SqlTemplate
+                .forQuery(sqlClient, """
+                        SELECT COUNT(*)
+                        FROM file_record
+                        WHERE rclone_status = #{status}
+                          AND type != 'thumbnail'
+                        """)
+                .mapTo(rs -> rs.getInteger(0))
+                .execute(Map.of("status", status))
+                .map(rs -> rs.size() > 0 ? rs.iterator().next() : 0)
+                .onFailure(err -> log.error("Failed to count rclone status: %s".formatted(err.getMessage())));
+    }
+
+    @Override
+    public Future<List<FileRecord>> listRcloneStatus(String status, int limit) {
+        int bounded = Math.max(1, Math.min(limit, 100));
+        return SqlTemplate
+                .forQuery(sqlClient, """
+                        SELECT * FROM file_record
+                        WHERE rclone_status = #{status}
+                          AND type != 'thumbnail'
+                        ORDER BY COALESCE(completion_date, start_date, 0) DESC
+                        LIMIT #{limit}
+                        """)
+                .mapTo(FileRecord.ROW_MAPPER)
+                .execute(Map.of("status", status, "limit", bounded))
+                .map(IterUtil::toList)
+                .onFailure(err -> log.error("Failed to list rclone status: %s".formatted(err.getMessage())));
+    }
 }

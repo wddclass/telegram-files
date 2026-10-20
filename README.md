@@ -160,6 +160,59 @@ To reproduce a date folder named after the account, set the remote to `googledri
 
 rclone writes that exact object name (`copyto` or `moveto`). If a remote file with the same name already exists and is identical, rclone skips it. If the contents differ, rclone replaces the remote file. Add `{messageId}` to the template when file names can repeat on the same day.
 
+### Telegram Bot 控制（可选）
+
+不配置 `TG_BOT_TOKEN` 时，机器人不会启动，下载和网页不受影响。配置后，程序通过 Bot API **长轮询**收消息，不需要公网 Webhook。
+
+1. 在 Telegram 里找 [@BotFather](https://t.me/BotFather)，发送 `/newbot`，按提示创建机器人，复制 token。
+2. 查自己的数字用户 ID（不是 @用户名）。可以给 [@userinfobot](https://t.me/userinfobot) 或 [@getidsbot](https://t.me/getidsbot) 发一条消息。机器人日志里也会打出被拒绝的 `user id`，方便你把它加进白名单。
+3. 把下面的变量写进 `.env` 或 `docker-compose.yaml` 的 `environment`，然后重启容器。先给机器人发 `/start`。
+
+| 变量 | 作用 |
+| --- | --- |
+| `TG_BOT_TOKEN` | BotFather 给的 token。留空则关闭机器人。 |
+| `TG_BOT_ALLOWED_USERS` | 逗号分隔的数字用户 ID 和/或 `@用户名`。**必填**。为空时机器人拒绝所有人，并在日志里警告，不会回复。 |
+| `TG_BOT_PROXY` | 可选。Bot API 的 HTTP/SOCKS5 代理，例如 `http://127.0.0.1:7890` 或 `socks5://user:pass@10.0.0.1:1080`。账号里配置的 MTProto 代理不能给 Bot API 用；HTTP/SOCKS 可以填同一个地址。 |
+| `TG_BOT_DEFAULT_ACCOUNT` | 可选。多个已登录账号时默认用哪一个，填网页里看到的数字账号 ID，或账号显示名。 |
+| `TG_BOT_NOTIFY` | 可选。`true` 时，向私聊过机器人的白名单用户推送下载完成/失败、上传完成/失败。默认 `false`。 |
+| `TG_BOT_LANG` | 可选。默认中文。设为 `en` 时命令回复改为英文。 |
+
+白名单以外的人（包括群成员）发来的消息和按钮会被直接丢掉，不会收到任何说明。请在**私聊**里使用。群里的请求不会在群内回复，避免把文件列表暴露给其他人；在群里收普通消息还需要在 BotFather 里对这个机器人执行 `/setprivacy` 并选 Disable，否则它只能看到命令。
+
+命令：
+
+| 命令 | 作用 |
+| --- | --- |
+| `/status` | 已连接的 Telegram 账号和授权状态 |
+| `/downloads` | 正在下载的文件（进度百分比、速度、大小），以及队列、暂停、失败数量 |
+| `/uploads` | rclone 正在上传的文件、等待/失败数量、最近完成的上传。rclone 本身不提供实时百分比时会标明进度不可用 |
+| `/help` | 帮助 |
+
+把消息链接发给机器人即可下载，例如 `https://t.me/username/123` 或私有频道 `https://t.me/c/1234567890/123`。相册和一条消息里的多个媒体会用现有的链接解析（含相册补全）展开成列表，再用按钮选择：全部下载、仅视频、仅图片，或单个文件。下载进入现有任务队列，因此已开启的 rclone 自动上传同样生效。有多个已授权账号、且没有匹配的默认账号时，会先让你选账号。
+
+```yaml
+services:
+  telegram-files:
+    image: ghcr.io/wddclass/telegram-files:custom-latest
+    restart: always
+    ports:
+      - "6543:80"
+    environment:
+      APP_ENV: "prod"
+      APP_ROOT: "/app/data"
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
+      # 留空整段即可关闭机器人
+      TG_BOT_TOKEN: ${TG_BOT_TOKEN}
+      TG_BOT_ALLOWED_USERS: ${TG_BOT_ALLOWED_USERS}
+      # TG_BOT_PROXY: http://127.0.0.1:7890
+      # TG_BOT_DEFAULT_ACCOUNT: "123456789"
+      # TG_BOT_NOTIFY: "true"
+      # TG_BOT_LANG: zh
+    volumes:
+      - ./data:/app/data
+```
+
 **Install on unRaid**
 
 On unRaid, install from the Community Repositories by searching for `telegram-files`.

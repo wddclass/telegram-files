@@ -612,6 +612,17 @@ public class TelegramVerticle extends AbstractVerticle {
                 .mapEmpty();
     }
 
+    /**
+     * Current download speed in bytes per second, from the same samples the UI uses.
+     */
+    public long currentDownloadSpeed() {
+        long latest = avgSpeed.latestSpeed();
+        if (latest > 0) {
+            return latest;
+        }
+        return avgSpeed.getSpeedStats().avgSpeed();
+    }
+
     public Future<JsonObject> getDownloadStatistics() {
         return Future.all(DataVerticle.fileRepository.getDownloadStatistics(this.telegramRecord.id()),
                 client.execute(new TdApi.GetNetworkStatistics())

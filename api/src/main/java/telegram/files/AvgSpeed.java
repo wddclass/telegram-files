@@ -144,6 +144,14 @@ public class AvgSpeed {
     /**
      * Get average speed in bytes per second for last interval
      */
+    /**
+     * Most recent smoothed speed sample, in bytes per second.
+     */
+    public long latestSpeed() {
+        Map.Entry<Long, SpeedPoint> last = speedPoints.lastEntry();
+        return last == null ? 0 : last.getValue().speed();
+    }
+
     public long getSpeed() {
         if (speedPoints.size() < 2) {
             return 0;
