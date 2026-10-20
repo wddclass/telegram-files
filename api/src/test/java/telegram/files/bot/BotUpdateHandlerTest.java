@@ -112,7 +112,10 @@ public class BotUpdateHandlerTest {
         String onlyVideos = callbackData(harness.gateway.sent.getFirst().markup(), "仅视频");
         harness.handler.onUpdate(callbackUpdate(5, null, 5, "private", onlyVideos, "go"));
         assertEquals(List.of(11, 13), harness.backend.started.stream().map(BotMedia::fileId).toList());
+        assertEquals(List.of("go"), harness.gateway.answered);
+        assertEquals(List.of(new RecordingGateway.Deleted(5, 10)), harness.gateway.deleted);
         assertTrue(harness.gateway.sent.get(1).text().contains("已开始下载 2"));
+        assertEquals(null, harness.gateway.sent.get(1).messageId());
     }
 
     @Test
@@ -247,8 +250,13 @@ public class BotUpdateHandlerTest {
     private static final class RecordingGateway implements BotGateway {
         final List<Sent> sent = new ArrayList<>();
         final List<String> answered = new ArrayList<>();
+        final List<Deleted> deleted = new ArrayList<>();
+        boolean deleteSucceeds = true;
 
         record Sent(long chatId, Integer messageId, String text, JsonObject markup) {
+        }
+
+        record Deleted(long chatId, int messageId) {
         }
 
         @Override
@@ -259,6 +267,16 @@ public class BotUpdateHandlerTest {
         @Override
         public void edit(long chatId, int messageId, String text, JsonObject replyMarkup) {
             sent.add(new Sent(chatId, messageId, text, replyMarkup));
+        }
+
+        @Override
+        public void delete(long chatId, int messageId, Runnable onDeleted, Runnable onFailed) {
+            deleted.add(new Deleted(chatId, messageId));
+            if (deleteSucceeds) {
+                onDeleted.run();
+            } else {
+                onFailed.run();
+            }
         }
 
         @Override
@@ -274,6 +292,7 @@ public class BotUpdateHandlerTest {
         final List<String> parsedLinks = new ArrayList<>();
         final List<Long> parsedAccounts = new ArrayList<>();
         final List<BotMedia> started = new ArrayList<>();
+        boolean failDownloads;
         DownloadReport downloadReport = DownloadReport.empty();
         UploadReport uploadReport = UploadReport.empty(false);
 
@@ -296,6 +315,9 @@ public class BotUpdateHandlerTest {
 
         @Override
         public Future<BotDownloadResult> startDownloads(long accountId, List<BotMedia> files) {
+            if (failDownloads) {
+                return Future.failedFuture("nope");
+            }
             started.addAll(files);
             return Future.succeededFuture(new BotDownloadResult(files.size(), 0, 0, List.of()));
         }
@@ -309,6 +331,80 @@ public class BotUpdateHandlerTest {
         public Future<UploadReport> uploadReport() {
             return Future.succeededFuture(uploadReport);
         }
+    }
+
+    @Test
+    void downloadChoiceDeletesTheSelectionMessageAndConfirms() {
+        Harness harness = harness("5", true);
+        harness.backend.accounts = List.of(new BotAccount(5, "only", true, "ready"));
+        harness.backend.media = List.of(
+                new BotMedia(1, 1, 1, "photo", "a.jpg", 1),
+                new BotMedia(2, 1, 2, "video", "b.mp4", 2)
+        );
+        harness.handler.onUpdate(messageUpdate(5, null, 5, "private", "https://t.me/news/3"));
+        String photos = callbackData(harness.gateway.sent.getFirst().markup(), "仅图片");
+        harness.handler.onUpdate(callbackUpdate(5, null, 5, "private", photos, "photos"));
+
+        assertEquals(List.of(1), harness.backend.started.stream().map(BotMedia::fileId).toList());
+        assertEquals(List.of("photos"), harness.gateway.answered);
+        assertEquals(List.of(new RecordingGateway.Deleted(5, 10)), harness.gateway.deleted);
+        assertTrue(harness.gateway.sent.get(1).text().contains("已开始下载 1"));
+        assertEquals(null, harness.gateway.sent.get(1).messageId());
+    }
+
+    @Test
+    void oldSelectionMessageIsEditedWhenDeleteFails() {
+        Harness harness = harness("5", true);
+        harness.gateway.deleteSucceeds = false;
+        harness.backend.accounts = List.of(new BotAccount(5, "only", true, "ready"));
+        harness.backend.media = List.of(new BotMedia(7, 1, 2, "video", "clip.mp4", 9));
+        harness.handler.onUpdate(messageUpdate(5, null, 5, "private", "https://t.me/news/4"));
+        String all = callbackData(harness.gateway.sent.getFirst().markup(), "全部下载");
+        harness.handler.onUpdate(callbackUpdate(5, null, 5, "private", all, "all"));
+
+        assertEquals(List.of("all"), harness.gateway.answered);
+        assertEquals(List.of(new RecordingGateway.Deleted(5, 10)), harness.gateway.deleted);
+        RecordingGateway.Sent confirmation = harness.gateway.sent.get(1);
+        assertEquals(10, confirmation.messageId());
+        assertTrue(confirmation.text().contains("已开始下载 1"));
+        assertEquals(0, confirmation.markup().getJsonArray("inline_keyboard").size());
+        assertEquals(2, harness.gateway.sent.size());
+    }
+
+    @Test
+    void accountPickThenDownloadRemovesTheMediaList() {
+        Harness harness = new Harness(BotAllowlist.parse("5"), true, null);
+        harness.backend.accounts = List.of(
+                new BotAccount(1, "alpha", true, "ready"),
+                new BotAccount(3, "gamma", true, "ready")
+        );
+        harness.handler.onUpdate(messageUpdate(5, null, 5, "private", "https://t.me/news/9"));
+        String gamma = callbackData(harness.gateway.sent.getFirst().markup(), "gamma");
+        harness.backend.media = List.of(new BotMedia(9, 1, 2, "video", "v.mp4", 5));
+        harness.handler.onUpdate(callbackUpdate(5, null, 5, "private", gamma, "pick"));
+        assertTrue(harness.gateway.deleted.isEmpty());
+
+        String all = callbackData(harness.gateway.sent.get(1).markup(), "全部下载");
+        harness.handler.onUpdate(callbackUpdate(5, null, 5, "private", all, "go"));
+        assertEquals(List.of("pick", "go"), harness.gateway.answered);
+        assertEquals(List.of(new RecordingGateway.Deleted(5, 10)), harness.gateway.deleted);
+        assertTrue(harness.gateway.sent.get(2).text().contains("已开始下载 1"));
+    }
+
+    @Test
+    void failedDownloadKeepsTheSelectionMessage() {
+        Harness harness = harness("5", true);
+        harness.backend.failDownloads = true;
+        harness.backend.accounts = List.of(new BotAccount(5, "only", true, "ready"));
+        harness.backend.media = List.of(new BotMedia(1, 1, 1, "video", "a.mp4", 1));
+        harness.handler.onUpdate(messageUpdate(5, null, 5, "private", "https://t.me/news/5"));
+        String all = callbackData(harness.gateway.sent.getFirst().markup(), "全部下载");
+        harness.handler.onUpdate(callbackUpdate(5, null, 5, "private", all, "fail"));
+
+        assertEquals(List.of("fail"), harness.gateway.answered);
+        assertTrue(harness.gateway.deleted.isEmpty());
+        assertTrue(harness.gateway.sent.get(1).text().contains("失败"));
+        assertTrue(harness.gateway.sent.getFirst().markup().getJsonArray("inline_keyboard").size() > 0);
     }
 
     @Test

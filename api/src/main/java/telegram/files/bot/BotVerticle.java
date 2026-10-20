@@ -162,6 +162,23 @@ public class BotVerticle extends AbstractVerticle {
             }
 
             @Override
+            public void delete(long chatId, int messageId, Runnable onDeleted, Runnable onFailed) {
+                api.deleteMessage(chatId, messageId).onComplete(result -> {
+                    if (result.succeeded()) {
+                        if (onDeleted != null) {
+                            onDeleted.run();
+                        }
+                        return;
+                    }
+                    log.info("Could not delete bot message %d in %d (%s); editing it instead"
+                            .formatted(messageId, chatId, result.cause().getMessage()));
+                    if (onFailed != null) {
+                        onFailed.run();
+                    }
+                });
+            }
+
+            @Override
             public void answer(String callbackId, String text) {
                 if (callbackId == null) {
                     return;

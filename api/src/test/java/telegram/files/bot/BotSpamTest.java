@@ -41,6 +41,11 @@ public class BotSpamTest {
                     }
 
                     @Override
+                    public void delete(long chatId, int messageId, Runnable onDeleted, Runnable onFailed) {
+                        onDeleted.run();
+                    }
+
+                    @Override
                     public void answer(String callbackId, String text) {
                     }
                 },
