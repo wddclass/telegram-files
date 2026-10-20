@@ -158,7 +158,7 @@ public final class BotUpdateHandler {
         }
         switch (action.get()) {
             case BotCallbacks.AccountChoice choice -> onAccountChoice(choice, userId, chatId, callbackId, messageId, canEdit);
-            case BotCallbacks.DownloadChoice choice -> onDownloadChoice(choice, userId, chatId, callbackId);
+            case BotCallbacks.DownloadChoice choice -> onDownloadChoice(choice, userId, chatId, callbackId, messageChatId(chat, chatId), messageId);
         }
     }
 
@@ -198,7 +198,12 @@ public final class BotUpdateHandler {
                 .onFailure(err -> show(chatId, messageId, canEdit, texts.parseFailed(err.getMessage()), BotKeyboards.removed()));
     }
 
-    private void onDownloadChoice(BotCallbacks.DownloadChoice choice, long userId, long chatId, String callbackId) {
+    private void onDownloadChoice(BotCallbacks.DownloadChoice choice,
+                                  long userId,
+                                  long chatId,
+                                  String callbackId,
+                                  long messageChatId,
+                                  Integer messageId) {
         Optional<BotSessions.Session> found = owned(choice.token(), userId);
         if (found.isEmpty()) {
             gateway.answer(callbackId, null);
@@ -218,8 +223,27 @@ public final class BotUpdateHandler {
         }
         gateway.answer(callbackId, texts.starting());
         backend.startDownloads(session.accountId(), selected)
-                .onSuccess(result -> gateway.send(chatId, texts.started(result), null))
+                .onSuccess(result -> clearSelection(chatId, messageChatId, messageId, texts.started(result)))
                 .onFailure(err -> gateway.send(chatId, texts.failed(texts.chinese() ? "下载" : "Download", err.getMessage()), null));
+    }
+
+    /**
+     * Drops the media list and its buttons once the download has started, then leaves a short confirmation.
+     * Messages older than 48 hours cannot be deleted; those are edited into the confirmation with the keyboard removed.
+     */
+    private void clearSelection(long chatId, long messageChatId, Integer messageId, String confirmation) {
+        if (messageId == null || messageId <= 0 || messageChatId == 0) {
+            gateway.send(chatId, confirmation, null);
+            return;
+        }
+        gateway.delete(messageChatId, messageId,
+                () -> gateway.send(chatId, confirmation, null),
+                () -> gateway.edit(messageChatId, messageId, confirmation, BotKeyboards.removed()));
+    }
+
+    private static long messageChatId(JsonObject chat, long fallback) {
+        long id = number(chat, "id");
+        return id == 0 ? fallback : id;
     }
 
     private Optional<BotSessions.Session> owned(String token, long userId) {

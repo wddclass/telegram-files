@@ -85,6 +85,11 @@ public final class BotApiClient {
         return enqueue("editMessageText", body, true);
     }
 
+    public Future<JsonObject> deleteMessage(long chatId, int messageId) {
+        JsonObject body = new JsonObject().put("chat_id", chatId).put("message_id", messageId);
+        return enqueue("deleteMessage", body, true);
+    }
+
     public Future<JsonObject> answerCallbackQuery(String callbackId, String text) {
         JsonObject body = new JsonObject().put("callback_query_id", callbackId);
         if (text != null && !text.isBlank()) {
