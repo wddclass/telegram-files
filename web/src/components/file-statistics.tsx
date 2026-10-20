@@ -26,6 +26,8 @@ import useSWRMutation from "swr/mutation";
 import type { TelegramApiResult } from "@/lib/types"; // Define a fetcher function to handle the API request
 import prettyBytes from "pretty-bytes";
 import { useSettings } from "@/hooks/use-settings";
+import { useTranslations } from "next-intl";
+import { useDateFnsLocale } from "@/i18n/locale";
 
 // Interface defining the structure of the data returned from the API
 interface StatisticsData {
@@ -59,6 +61,8 @@ interface FileStatisticsProps {
 
 const FileStatistics: React.FC<FileStatisticsProps> = ({ telegramId }) => {
   const { settings } = useSettings();
+  const t = useTranslations("statistics");
+  const dateLocale = useDateFnsLocale();
   // Use SWR for data fetching and caching
   const { data, error, mutate } = useSWR<StatisticsData, Error>(
     `/telegram/${telegramId}/download-statistics`,
@@ -80,7 +84,7 @@ const FileStatistics: React.FC<FileStatisticsProps> = ({ telegramId }) => {
     return (
       <div className="flex items-center space-x-2 rounded-lg bg-white p-4 text-red-600 shadow-md dark:bg-red-50 dark:text-red-400">
         <AlertTriangle className="h-5 w-5" />
-        <span>Failed to load data.</span>
+        <span>{t("loadFailed")}</span>
       </div>
     );
   }
@@ -93,7 +97,7 @@ const FileStatistics: React.FC<FileStatisticsProps> = ({ telegramId }) => {
           className="h-5 w-5 animate-spin"
           style={{ strokeWidth: "0.8px" }}
         />
-        <span>Loading...</span>
+        <span>{t("loading")}</span>
       </div>
     );
   }
@@ -114,23 +118,23 @@ const FileStatistics: React.FC<FileStatisticsProps> = ({ telegramId }) => {
   // Prepare an array of completed file types with their respective icons
   const completedTypes = [
     {
-      label: "Photo",
+      label: t("photo"),
       value: photo,
       // eslint-disable-next-line jsx-a11y/alt-text
       icon: <Image className="h-5 w-5 text-blue-500" />,
     },
     {
-      label: "Video",
+      label: t("video"),
       value: video,
       icon: <Video className="h-5 w-5 text-green-500" />,
     },
     {
-      label: "Audio",
+      label: t("audio"),
       value: audio,
       icon: <Music className="h-5 w-5 text-purple-500" />,
     },
     {
-      label: "File",
+      label: t("file"),
       value: file,
       icon: <File className="h-5 w-5 text-gray-500" />,
     },
@@ -138,28 +142,28 @@ const FileStatistics: React.FC<FileStatisticsProps> = ({ telegramId }) => {
 
   const avgStatFields = [
     {
-      label: "Avg",
+      label: t("avg"),
       value: prettyBytes(data.speedStats.avgSpeed, { bits: settings?.speedUnits === 'bits' }) + "/s",
       icon: PauseCircle,
       color: "text-blue-500",
       bgColor: "bg-blue-100",
     },
     {
-      label: "Max",
+      label: t("max"),
       value: prettyBytes(data.speedStats.maxSpeed, { bits: settings?.speedUnits === 'bits' }) + "/s",
       icon: ArrowUp,
       color: "text-green-500",
       bgColor: "bg-green-100",
     },
     {
-      label: "Median",
+      label: t("median"),
       value: prettyBytes(data.speedStats.medianSpeed, { bits: settings?.speedUnits === 'bits' }) + "/s",
       icon: LineChart,
       color: "text-purple-500",
       bgColor: "bg-purple-100",
     },
     {
-      label: "Min",
+      label: t("min"),
       value: prettyBytes(data.speedStats.minSpeed, { bits: settings?.speedUnits === 'bits' }) + "/s",
       icon: ArrowDown,
       color: "text-red-500",
@@ -173,7 +177,7 @@ const FileStatistics: React.FC<FileStatisticsProps> = ({ telegramId }) => {
         <div className="flex items-center space-x-3 border-gray-200">
           <h3 className="text-md flex items-center space-x-2 font-semibold text-gray-700 dark:text-gray-200">
             <CloudDownload className="h-5 w-5 text-blue-600" />
-            <span>Download Statistics</span>
+            <span>{t("download")}</span>
           </h3>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-5">
@@ -181,7 +185,7 @@ const FileStatistics: React.FC<FileStatisticsProps> = ({ telegramId }) => {
             <div className="flex items-center space-x-2">
               <FileText className="h-5 w-5 text-gray-600 dark:text-gray-400" />
               <span className="text-sm text-gray-600 dark:text-gray-400">
-                Total Files
+                {t("total")}
               </span>
             </div>
             <div className="mt-2 text-center text-lg font-semibold text-gray-800 dark:text-gray-200">
@@ -192,7 +196,7 @@ const FileStatistics: React.FC<FileStatisticsProps> = ({ telegramId }) => {
             <div className="flex items-center space-x-2">
               <Download className="h-5 w-5 text-blue-600" />
               <span className="text-sm text-gray-600 dark:text-gray-400">
-                Downloading
+                {t("downloading")}
               </span>
             </div>
             <div className="mt-2 text-center text-lg font-semibold text-gray-800 dark:text-gray-200">
@@ -203,7 +207,7 @@ const FileStatistics: React.FC<FileStatisticsProps> = ({ telegramId }) => {
             <div className="flex items-center space-x-2">
               <PauseCircle className="h-5 w-5 text-yellow-500" />
               <span className="text-sm text-gray-600 dark:text-gray-400">
-                Paused
+                {t("paused")}
               </span>
             </div>
             <div className="mt-2 text-center text-lg font-semibold text-gray-800 dark:text-gray-200">
@@ -214,7 +218,7 @@ const FileStatistics: React.FC<FileStatisticsProps> = ({ telegramId }) => {
             <div className="flex items-center space-x-2">
               <CheckCircle className="h-5 w-5 text-green-600" />
               <span className="text-sm text-gray-600 dark:text-gray-400">
-                Completed
+                {t("completed")}
               </span>
             </div>
             <div className="mt-2 text-center text-lg font-semibold text-gray-800 dark:text-gray-200">
@@ -225,7 +229,7 @@ const FileStatistics: React.FC<FileStatisticsProps> = ({ telegramId }) => {
             <div className="flex items-center space-x-2">
               <AlertTriangle className="h-5 w-5 text-red-600" />
               <span className="text-sm text-gray-600 dark:text-gray-400">
-                Error
+                {t("error")}
               </span>
             </div>
             <div className="mt-2 text-center text-lg font-semibold text-gray-800 dark:text-gray-200">
@@ -239,9 +243,9 @@ const FileStatistics: React.FC<FileStatisticsProps> = ({ telegramId }) => {
         <div className="flex items-center space-x-3 border-gray-200 dark:border-gray-700">
           <h3 className="text-md flex items-center space-x-2 text-nowrap font-semibold text-gray-700 dark:text-gray-200">
             <Clock className="h-5 w-5 text-yellow-500" />
-            <span>Speed Statistics</span>
+            <span>{t("speed")}</span>
             <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              ({data.speedStats.interval / 60} minute interval)
+              {t("interval", { minutes: data.speedStats.interval / 60 })}
             </span>
           </h3>
         </div>
@@ -271,7 +275,7 @@ const FileStatistics: React.FC<FileStatisticsProps> = ({ telegramId }) => {
         <div className="flex-1 rounded-lg bg-white p-4 shadow-md dark:bg-gray-900 md:col-span-2">
           <h3 className="text-md flex items-center space-x-2 font-semibold text-gray-700 dark:text-gray-200">
             <CheckCircle className="h-5 w-5 text-green-600" />
-            <span>Completed by Type</span>
+            <span>{t("byType")}</span>
           </h3>
           <ul className="mt-4 grid grid-cols-2 gap-4">
             {completedTypes.map((type) => (
@@ -296,7 +300,7 @@ const FileStatistics: React.FC<FileStatisticsProps> = ({ telegramId }) => {
         <div className="flex-1 rounded-lg bg-white p-4 shadow-md dark:bg-gray-900">
           <h3 className="text-md flex items-center space-x-2 font-semibold text-gray-700 dark:text-gray-200">
             <Network className="h-5 w-5 text-gray-500" />
-            <span>Network Statistics</span>
+            <span>{t("network")}</span>
           </h3>
           <div className="mt-4 h-full">
             <div className="flex items-center justify-center space-x-2 rounded-lg bg-gray-50 p-4 shadow-sm dark:bg-gray-800">
@@ -323,16 +327,18 @@ const FileStatistics: React.FC<FileStatisticsProps> = ({ telegramId }) => {
                   });
                 }}
               >
-                {isResetMutating ? "Resetting..." : "Reset"}
+                {isResetMutating ? t("resetting") : t("reset")}
               </Button>
               <p className="text-right text-sm text-gray-400">
-                Since:{" "}
-                {formatDistanceToNow(
-                  new Date(data.networkStatistics.sinceDate * 1000),
-                  {
-                    addSuffix: true,
-                  },
-                )}
+                {t("since", {
+                  time: formatDistanceToNow(
+                    new Date(data.networkStatistics.sinceDate * 1000),
+                    {
+                      addSuffix: true,
+                      locale: dateLocale,
+                    },
+                  ),
+                })}
               </p>
             </div>
           </div>

@@ -90,13 +90,23 @@ tasks.build {
     dependsOn shadowJar
 }
 
+def appVersion = System.getenv('APP_VERSION') ?: project.version
+def gitCommit = System.getenv('APP_GIT_COMMIT') ?: getGitCommitFull()
+def gitCommitShort = System.getenv('APP_GIT_COMMIT_SHORT') ?: getGitCommit()
+def gitRef = System.getenv('APP_GIT_REF') ?: ''
+
 shadowJar {
     archiveBaseName.set('telegram-files')
     archiveClassifier.set('')
     archiveVersion.set('')
     manifest {
         attributes(
-                'Main-Class': 'telegram.files.Start'
+                'Main-Class': 'telegram.files.Start',
+                'Implementation-Title': project.name,
+                'Implementation-Version': appVersion,
+                'Git-Commit': gitCommit,
+                'Git-Commit-Short': gitCommitShort,
+                'Git-Ref': gitRef,
         )
     }
 }
@@ -115,7 +125,17 @@ tasks.named('jar') {
 
 static def getGitCommit() {
     try {
-        return 'git rev-parse --short HEAD'.execute().text.trim()
+        def value = 'git rev-parse --short HEAD'.execute().text.trim()
+        return value ?: 'unknown'
+    } catch (ignored) {
+        return 'unknown'
+    }
+}
+
+static def getGitCommitFull() {
+    try {
+        def value = 'git rev-parse HEAD'.execute().text.trim()
+        return value ?: 'unknown'
     } catch (ignored) {
         return 'unknown'
     }

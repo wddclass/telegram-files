@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "next-themes";
+import { useTranslations } from "next-intl";
 
 interface TagsInputProps {
   value: string[];
@@ -17,7 +18,7 @@ interface TagsInputProps {
 export const TagsInput: React.FC<TagsInputProps> = ({
   value,
   onChange,
-  placeholder = "Enter the tag and press Enter...",
+  placeholder,
   maxTags = Infinity,
   className = "",
 }) => {
@@ -25,6 +26,9 @@ export const TagsInput: React.FC<TagsInputProps> = ({
   const [isInputFocused, setIsInputFocused] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { theme } = useTheme();
+  const t = useTranslations("tags");
+  const tCommon = useTranslations("common");
+  const resolvedPlaceholder = placeholder ?? t("placeholder");
 
   const handleAddTag = (tag: string) => {
     const trimmedTag = tag.trim();
@@ -106,7 +110,9 @@ export const TagsInput: React.FC<TagsInputProps> = ({
                   }}
                 >
                   <X className="h-3 w-3" />
-                  <span className="sr-only">Delete {tag}</span>
+                  <span className="sr-only">
+                    {tCommon("delete")} {tag}
+                  </span>
                 </Button>
               </Badge>
             </motion.div>
@@ -122,7 +128,7 @@ export const TagsInput: React.FC<TagsInputProps> = ({
             onKeyDown={handleKeyDown}
             onFocus={() => setIsInputFocused(true)}
             onBlur={() => setIsInputFocused(false)}
-            placeholder={value.length === 0 ? placeholder : ""}
+            placeholder={value.length === 0 ? resolvedPlaceholder : ""}
             className="border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
           />
         </div>
@@ -141,7 +147,7 @@ export const TagsInput: React.FC<TagsInputProps> = ({
               onClick={() => handleAddTag(inputValue)}
             >
               <Plus className="h-4 w-4" />
-              <span className="sr-only">Add tag</span>
+              <span className="sr-only">{t("add")}</span>
             </Button>
           </motion.div>
         )}

@@ -2,6 +2,7 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { Rows2, Rows3, Rows4 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 const heightOptions = [
   {
@@ -55,6 +56,8 @@ export const TableRowHeightSwitch = ({
   rowHeight: RowHeight;
   setRowHeightAction: (e: RowHeight) => void;
 }) => {
+  const t = useTranslations("rowHeight");
+  const labels = { s: t("small"), m: t("medium"), l: t("large") };
   return (
     <Tabs
       value={rowHeight}
@@ -64,13 +67,13 @@ export const TableRowHeightSwitch = ({
       key="height"
     >
       <TabsList className="gap-1 border bg-transparent px-2">
-        {heightOptions.map(({ id, label, icon }) => (
+        {heightOptions.map(({ id, icon }) => (
           <TabsTrigger
             key={id}
             value={id}
             className="px-2 shadow-none data-[state=active]:bg-input data-[state=active]:ring-border"
           >
-            <span role="img" aria-label={`${label} size`}>
+            <span role="img" aria-label={labels[id]}>
               {icon}
             </span>
           </TabsTrigger>

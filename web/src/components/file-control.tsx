@@ -27,6 +27,7 @@ import { useTelegramMethod } from "@/hooks/use-telegram-method";
 import { toast } from "@/hooks/use-toast";
 import { useMaybeTelegramChat } from "@/hooks/use-telegram-chat";
 import { useSettings } from "@/hooks/use-settings";
+import { useTranslations } from "next-intl";
 
 interface ActionButtonProps {
   tooltipText: string;
@@ -71,6 +72,7 @@ export default function FileControl({
   isMobile?: boolean;
 }) {
   const router = useRouter();
+  const t = useTranslations("files");
   const { executeMethod, isMethodExecuting } = useTelegramMethod();
   const { settings } = useSettings();
   const { chat } = useMaybeTelegramChat() ?? {};
@@ -93,7 +95,7 @@ export default function FileControl({
 
   const removeBtnProps: ActionButtonProps = {
     onClick: () => remove(file.id),
-    tooltipText: "Remove",
+    tooltipText: t("remove"),
     icon: <FileX className={iconSize} />,
     loading: removing,
   };
@@ -117,7 +119,7 @@ export default function FileControl({
             if (!result) {
               toast({
                 variant: "error",
-                description: "Failed to get message thread",
+                description: t("threadFailed"),
               });
               return;
             }
@@ -132,12 +134,12 @@ export default function FileControl({
           .catch(() => {
             toast({
               variant: "error",
-              description: "Failed to get message thread",
+              description: t("threadFailed"),
             });
           });
       }
     },
-    tooltipText: "View Comments",
+    tooltipText: t("viewComments"),
     icon: <MessageSquareText className={iconSize} />,
     loading: isMethodExecuting,
   };
@@ -146,7 +148,7 @@ export default function FileControl({
     idle: [
       {
         onClick: () => start(file.id),
-        tooltipText: "Start Download",
+        tooltipText: t("startDownload"),
         icon: <ArrowDown className={iconSize} />,
         loading: starting,
       },
@@ -154,7 +156,7 @@ export default function FileControl({
     error: [
       {
         onClick: () => start(file.id),
-        tooltipText: "Retry",
+        tooltipText: t("retry"),
         icon: <ArrowDown className={iconSize} />,
         loading: starting,
       },
@@ -162,13 +164,13 @@ export default function FileControl({
     downloading: [
       {
         onClick: () => togglePause(file.id),
-        tooltipText: "Pause",
+        tooltipText: t("pause"),
         icon: <Pause className={iconSize} />,
         loading: togglingPause,
       },
       {
         onClick: () => cancel(file.id),
-        tooltipText: "Cancel",
+        tooltipText: t("cancel"),
         icon: <SquareX className={iconSize} />,
         loading: cancelling,
       },
@@ -176,13 +178,13 @@ export default function FileControl({
     paused: [
       {
         onClick: () => togglePause(file.id),
-        tooltipText: "Resume",
+        tooltipText: t("resume"),
         icon: <StepForward className={iconSize} />,
         loading: togglingPause,
       },
       {
         onClick: () => cancel(file.id),
-        tooltipText: "Cancel",
+        tooltipText: t("cancel"),
         icon: <SquareX className={iconSize} />,
         loading: cancelling,
       },
@@ -196,7 +198,7 @@ export default function FileControl({
         className="flex w-full items-center justify-end space-x-4 md:justify-around md:space-x-2"
         onClick={(e) => e.preventDefault()}
       >
-        <TooltipWrapper content="Missing Original Message">
+        <TooltipWrapper content={t("missingOriginal")}>
           <Badge className="bg-yellow-300 text-yellow-900 hover:bg-yellow-400 dark:bg-yellow-800 dark:text-yellow-300 dark:hover:bg-yellow-700">
             <Unlink className="h-4 w-4" />
           </Badge>
@@ -262,6 +264,7 @@ export default function FileControl({
 }
 
 export function MobileFileControl({ file }: { file: TelegramFile }) {
+  const t = useTranslations("files");
   const {
     start,
     starting,
@@ -282,7 +285,7 @@ export function MobileFileControl({ file }: { file: TelegramFile }) {
           ) : (
             <ArrowDown className="h-4 w-4" />
           )}
-          <span className="ml-2">Download</span>
+          <span className="ml-2">{t("download")}</span>
         </Button>
       )}
       {(file.downloadStatus === "downloading" ||
@@ -297,7 +300,7 @@ export function MobileFileControl({ file }: { file: TelegramFile }) {
               <StepForward className="h-4 w-4" />
             )}
             <span className="ml-2">
-              {file.downloadStatus === "downloading" ? "Pause" : "Resume"}
+              {file.downloadStatus === "downloading" ? t("pause") : t("resume")}
             </span>
           </Button>
           <Button
@@ -310,7 +313,7 @@ export function MobileFileControl({ file }: { file: TelegramFile }) {
             ) : (
               <SquareX className="h-4 w-4" />
             )}
-            <span className="ml-2">Cancel</span>
+            <span className="ml-2">{t("cancel")}</span>
           </Button>
         </>
       )}
@@ -325,7 +328,7 @@ export function MobileFileControl({ file }: { file: TelegramFile }) {
           ) : (
             <FileX className="h-4 w-4" />
           )}
-          <span className="ml-2">Remove</span>
+          <span className="ml-2">{t("remove")}</span>
         </Button>
       )}
     </div>

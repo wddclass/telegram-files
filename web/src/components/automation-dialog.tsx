@@ -21,6 +21,8 @@ import { type Auto } from "@/lib/types";
 import { Badge } from "./ui/badge";
 import { cn } from "@/lib/utils";
 import AutomationForm from "@/components/automation-form";
+import { useTranslations } from "next-intl";
+import { isFileTypeKey } from "@/i18n/labels";
 
 const DEFAULT_AUTO: Auto = {
   preload: {
@@ -53,6 +55,31 @@ export default function AutomationDialog() {
   const { accountId } = useTelegramAccount();
   const { isLoading, chat, reload } = useTelegramChat();
   const { toast } = useToast();
+  const t = useTranslations("automation");
+  const tc = useTranslations("common");
+  const tType = useTranslations("fileType");
+  const policyTitle = (policy: string) => {
+    switch (policy) {
+      case "DIRECT":
+        return t("policies.DIRECT.title");
+      case "GROUP_BY_CHAT":
+        return t("policies.GROUP_BY_CHAT.title");
+      case "GROUP_BY_TYPE":
+        return t("policies.GROUP_BY_TYPE.title");
+      case "GROUP_BY_AI":
+        return t("policies.GROUP_BY_AI.title");
+      case "OVERWRITE":
+        return t("policies.OVERWRITE.title");
+      case "SKIP":
+        return t("policies.SKIP.title");
+      case "RENAME":
+        return t("policies.RENAME.title");
+      case "HASH":
+        return t("policies.HASH.title");
+      default:
+        return policy;
+    }
+  };
   const [open, setOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [auto, setAuto] = useState<Auto>(DEFAULT_AUTO);
@@ -74,7 +101,7 @@ export default function AutomationDialog() {
       onSuccess: () => {
         toast({
           variant: "success",
-          title: "Auto settings updated!",
+          title: t("updated"),
         });
         void reload();
         setEditMode(false);
@@ -122,7 +149,7 @@ export default function AutomationDialog() {
       >
         <DialogHeader>
           <DialogTitle>
-            Update Auto Settings for {chat?.name ?? "Unknown Chat"}
+            {t("title", { name: chat?.name ?? t("unknownChat") })}
           </DialogTitle>
         </DialogHeader>
         <DialogDescription></DialogDescription>
@@ -131,7 +158,7 @@ export default function AutomationDialog() {
             <div className="space-y-4 rounded-md border border-gray-200 p-4 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-semibold text-gray-900 dark:text-gray-300">
-                  Auto Preload
+                  {t("preload")}
                 </Label>
                 <Badge
                   variant="outline"
@@ -142,19 +169,19 @@ export default function AutomationDialog() {
                       : "bg-gray-500 dark:bg-gray-800 dark:text-gray-300",
                   )}
                 >
-                  {chat.auto.preload.enabled ? "Enabled" : "Disabled"}
+                  {chat.auto.preload.enabled ? tc("enabled") : tc("disabled")}
                 </Badge>
               </div>
               {(chat.auto.state & (1 << 1)) != 0 && (
                 <p className="text-xs text-muted-foreground">
-                  All historical files are preloaded.
+                  {t("preloadDone")}
                 </p>
               )}
             </div>
             <div className="space-y-4 rounded-md border border-gray-200 p-4 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-semibold text-gray-900 dark:text-gray-300">
-                  Auto Download
+                  {t("download")}
                 </Label>
                 <Badge
                   variant="outline"
@@ -165,14 +192,14 @@ export default function AutomationDialog() {
                       : "bg-gray-500 dark:bg-gray-800 dark:text-gray-300",
                   )}
                 >
-                  {chat.auto.download.enabled ? "Enabled" : "Disabled"}
+                  {chat.auto.download.enabled ? tc("enabled") : tc("disabled")}
                 </Badge>
               </div>
               {auto.download.enabled && (
                 <>
                   {(chat.auto.state & (1 << 2)) != 0 && (
                     <p className="text-xs text-muted-foreground">
-                      All historical files are started to be downloaded.
+                      {t("downloadStarted")}
                     </p>
                   )}
                   <div className="space-y-3">
@@ -180,29 +207,29 @@ export default function AutomationDialog() {
                     <div className="rounded-lg bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
                       <div className="flex flex-col space-y-1">
                         <span className="text-xs font-medium text-gray-500">
-                          Query Keyword
+                          {t("query")}
                         </span>
                         <span className="text-sm text-gray-500 dark:text-gray-300">
                           {chat.auto.download.rule.query ||
-                            "No keyword specified"}
+                            t("noQuery")}
                         </span>
                       </div>
                     </div>
                     <div className="rounded-lg bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
                       <div className="flex flex-col space-y-1">
                         <span className="text-xs font-medium text-gray-500">
-                          Filter Expression
+                          {t("filterExpr")}
                         </span>
                         <span className="text-sm text-gray-500 dark:text-gray-300">
                           {chat.auto.download.rule.filterExpr ||
-                            "No filter expression specified"}
+                            t("noFilter")}
                         </span>
                       </div>
                     </div>
 
                     <div className="rounded-lg bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
                       <span className="text-xs font-medium text-gray-500">
-                        File Types
+                        {t("fileTypes")}
                       </span>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {chat.auto.download.rule.fileTypes.length > 0 ? (
@@ -212,12 +239,12 @@ export default function AutomationDialog() {
                               variant="secondary"
                               className="flex items-center gap-1 border-gray-200 bg-white px-3 py-1 capitalize text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
                             >
-                              {type}
+                              {isFileTypeKey(type) ? tType(type) : type}
                             </Badge>
                           ))
                         ) : (
                           <span className="text-sm text-gray-500 dark:text-gray-300">
-                            No file types selected
+                            {t("noFileTypes")}
                           </span>
                         )}
                       </div>
@@ -225,7 +252,7 @@ export default function AutomationDialog() {
 
                     <div className="flex items-center justify-between rounded-lg bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
                       <span className="text-xs font-medium text-gray-500">
-                        Download History
+                        {t("downloadHistory")}
                       </span>
                       <Badge
                         className={cn(
@@ -235,14 +262,14 @@ export default function AutomationDialog() {
                         )}
                       >
                         {chat.auto.download.rule.downloadHistory
-                          ? "Enabled"
-                          : "Disabled"}
+                          ? tc("enabled")
+                          : tc("disabled")}
                       </Badge>
                     </div>
 
                     <div className="flex items-center justify-between rounded-lg bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
                       <span className="text-xs font-medium text-gray-500">
-                        Download Comment Files
+                        {t("downloadComments")}
                       </span>
                       <Badge
                         className={cn(
@@ -252,8 +279,8 @@ export default function AutomationDialog() {
                         )}
                       >
                         {chat.auto.download.rule.downloadCommentFiles
-                          ? "Enabled"
-                          : "Disabled"}
+                          ? tc("enabled")
+                          : tc("disabled")}
                       </Badge>
                     </div>
                   </div>
@@ -264,7 +291,7 @@ export default function AutomationDialog() {
             <div className="space-y-4 rounded-md border border-gray-200 p-4 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-semibold text-gray-900 dark:text-gray-300">
-                  Auto Transfer
+                  {t("transfer")}
                 </Label>
                 <Badge
                   variant="outline"
@@ -275,21 +302,21 @@ export default function AutomationDialog() {
                       : "bg-gray-500 dark:bg-gray-800 dark:text-gray-300",
                   )}
                 >
-                  {chat.auto.transfer.enabled ? "Enabled" : "Disabled"}
+                  {chat.auto.transfer.enabled ? tc("enabled") : tc("disabled")}
                 </Badge>
               </div>
               {chat.auto.transfer.enabled && (
                 <>
                   {(chat.auto.state & (1 << 4)) != 0 && (
                     <p className="text-xs text-muted-foreground">
-                      All historical download files are transferred.
+                      {t("transferDone")}
                     </p>
                   )}
                   <div className="space-y-3">
                     <div className="rounded-lg bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
                       <div className="flex flex-col space-y-1">
                         <span className="text-xs font-medium text-gray-500">
-                          Destination Folder
+                          {t("destination")}
                         </span>
                         <span className="text-sm text-gray-500 dark:text-gray-300">
                           {chat.auto.transfer.rule.destination}
@@ -299,10 +326,10 @@ export default function AutomationDialog() {
                     <div className="flex flex-col space-y-3 rounded-lg bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-gray-500 dark:text-gray-300">
-                          Transfer Policy
+                          {t("transferPolicy")}
                         </span>
                         <Badge variant="outline" className="font-normal">
-                          {chat.auto.transfer.rule.transferPolicy}
+                          {policyTitle(chat.auto.transfer.rule.transferPolicy)}
                         </Badge>
                       </div>
                       {chat.auto.transfer.rule.transferPolicy ===
@@ -314,15 +341,15 @@ export default function AutomationDialog() {
                     </div>
                     <div className="flex items-center justify-between rounded-lg bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
                       <span className="text-xs text-gray-500 dark:text-gray-300">
-                        Duplication Policy
+                        {t("duplicationPolicy")}
                       </span>
                       <Badge variant="outline" className="font-normal">
-                        {chat.auto.transfer.rule.duplicationPolicy}
+                        {policyTitle(chat.auto.transfer.rule.duplicationPolicy)}
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between rounded-lg bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
                       <span className="text-xs text-gray-500 dark:text-gray-300">
-                        Transfer History
+                        {t("transferHistory")}
                       </span>
                       <Badge
                         className={cn(
@@ -332,8 +359,8 @@ export default function AutomationDialog() {
                         )}
                       >
                         {chat.auto.transfer.rule.transferHistory
-                          ? "Enabled"
-                          : "Disabled"}
+                          ? tc("enabled")
+                          : tc("disabled")}
                       </Badge>
                     </div>
                   </div>
@@ -347,7 +374,7 @@ export default function AutomationDialog() {
         <DialogFooter className="gap-2">
           {!editMode && chat?.auto ? (
             <Button variant="outline" onClick={() => setEditMode(true)}>
-              Edit
+              {tc("edit")}
             </Button>
           ) : (
             <>
@@ -356,7 +383,7 @@ export default function AutomationDialog() {
                 onClick={() => setOpen(false)}
                 disabled={debounceIsAutoMutating}
               >
-                Cancel
+                {tc("cancel")}
               </Button>
               <Button
                 onClick={() => {
@@ -369,9 +396,8 @@ export default function AutomationDialog() {
                   ) {
                     toast({
                       variant: "warning",
-                      title: "Invalid destination folder",
-                      description:
-                        "Please enter a valid destination folder path",
+                      title: t("invalidFolder"),
+                      description: t("invalidFolderHint"),
                     });
                     return;
                   }
@@ -379,7 +405,7 @@ export default function AutomationDialog() {
                 }}
                 disabled={debounceIsAutoMutating}
               >
-                {debounceIsAutoMutating ? "Submitting..." : "Submit"}
+                {debounceIsAutoMutating ? t("submitting") : tc("submit")}
               </Button>
             </>
           )}

@@ -11,6 +11,7 @@ import FileImage from "../file-image";
 import { MobileFileTags } from "@/components/file-tags";
 import { TooltipWrapper } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
+import { useTranslations } from "next-intl";
 
 type FileCardProps = {
   index: number;
@@ -34,6 +35,7 @@ export function FileCard({
   layout,
 }: FileCardProps) {
   const { downloadProgress } = useFileSpeed(file);
+  const t = useTranslations("status");
   const isGalleryLayout = layout === "gallery";
   return (
     <Card
@@ -62,7 +64,7 @@ export function FileCard({
           )}
         >
           {file.reactionCount > 0 && (
-            <TooltipWrapper content="Reaction Count">
+            <TooltipWrapper content={t("reactionCount")}>
               <Badge className="absolute -left-1 -top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs hover:bg-blue-600">
                 {file.reactionCount}
               </Badge>

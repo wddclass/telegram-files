@@ -18,6 +18,7 @@ import {
 import useIsMobile from "@/hooks/use-is-mobile";
 import { request } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
+import { useTranslations } from "next-intl";
 
 export const DOWNLOAD_STATUS = {
   idle: {
@@ -114,6 +115,7 @@ export default function FileStatus({
   };
   const isMobile = useIsMobile();
   const [retrying, setRetrying] = useState(false);
+  const t = useTranslations("status");
   const rclone =
     file.rcloneStatus && file.rcloneStatus in RCLONE_STATUS
       ? RCLONE_STATUS[file.rcloneStatus]
@@ -125,12 +127,11 @@ export default function FileStatus({
       await request(`/file/${file.uniqueId}/rclone-retry`, {
         method: "POST",
       });
-      toast({ variant: "success", description: "Upload queued again" });
+      toast({ variant: "success", description: t("queuedAgain") });
     } catch (error) {
       toast({
         variant: "error",
-        description:
-          error instanceof Error ? error.message : "Failed to retry upload",
+        description: error instanceof Error ? error.message : t("retryFailed"),
       });
     } finally {
       setRetrying(false);
@@ -150,7 +151,7 @@ export default function FileStatus({
             animate="animate"
             exit="exit"
           >
-            <TooltipWrapper content="Download Status">
+            <TooltipWrapper content={t("download")}>
               <Badge
                 className={cn(
                   "h-6 text-xs hover:bg-gray-200",
@@ -158,7 +159,7 @@ export default function FileStatus({
                   isMobile && "shadow-none",
                 )}
               >
-                {DOWNLOAD_STATUS[file.downloadStatus].text}
+                {t(file.downloadStatus)}
               </Badge>
             </TooltipWrapper>
           </motion.div>
@@ -173,14 +174,18 @@ export default function FileStatus({
               animate="animate"
               exit="exit"
             >
-              <TooltipWrapper content="Transfer Status">
+              <TooltipWrapper content={t("transfer")}>
                 <Badge
                   className={cn(
                     "h-6 text-xs hover:bg-gray-200",
                     TRANSFER_STATUS[file.transferStatus].className,
                   )}
                 >
-                  {TRANSFER_STATUS[file.transferStatus].text}
+                  {file.transferStatus === "completed"
+                    ? t("transferred")
+                    : file.transferStatus === "error"
+                      ? t("transferError")
+                      : t(file.transferStatus)}
                 </Badge>
               </TooltipWrapper>
             </motion.div>
@@ -198,7 +203,7 @@ export default function FileStatus({
               content={
                 file.rcloneStatus === "failed" && file.rcloneError
                   ? file.rcloneError
-                  : "Rclone upload"
+                  : t("rclone")
               }
             >
               <Badge
@@ -208,7 +213,7 @@ export default function FileStatus({
                   isMobile && "shadow-none",
                 )}
               >
-                {rclone.text}
+                {t(file.rcloneStatus ?? "pending")}
               </Badge>
             </TooltipWrapper>
             {file.rcloneStatus === "failed" && (
@@ -218,7 +223,7 @@ export default function FileStatus({
                 size="xs"
                 disabled={retrying}
                 onClick={() => void retryUpload()}
-                aria-label="Retry rclone upload"
+                aria-label={t("retryUpload")}
               >
                 <RotateCcw className={cn("h-3 w-3", retrying && "animate-spin")} />
               </Button>

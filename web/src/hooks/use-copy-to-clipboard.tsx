@@ -1,9 +1,11 @@
 import { useCallback, useState } from "react";
 import { toast } from "./use-toast";
+import { useTranslations } from "next-intl";
 
 export function useCopyToClipboard(): [string | null, (value: string) => void] {
   const [state, setState] = useState<string | null>(null);
 
+  const t = useTranslations("toast");
   const copyToClipboard = useCallback((value: string) => {
     const handleCopy = async () => {
       try {
@@ -12,7 +14,7 @@ export function useCopyToClipboard(): [string | null, (value: string) => void] {
           setState(value);
           toast({
             variant: "success",
-            title: "Successfully copied to clipboard",
+            title: t("copied"),
             description: (
               <p className="line-clamp-1">
                 <code className="text-xs">{value}</code>
@@ -28,7 +30,7 @@ export function useCopyToClipboard(): [string | null, (value: string) => void] {
         setState(value);
         toast({
           variant: "success",
-          title: "Successfully copied to clipboard",
+          title: t("copied"),
           description: (
             <p className="line-clamp-1">
               <code className="text-xs">{value}</code>
@@ -39,7 +41,7 @@ export function useCopyToClipboard(): [string | null, (value: string) => void] {
     };
 
     void handleCopy();
-  }, []);
+  }, [t]);
 
   return [state, copyToClipboard];
 }

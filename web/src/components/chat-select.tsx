@@ -16,11 +16,14 @@ import { cn } from "@/lib/utils";
 import { CommandLoading } from "cmdk";
 import { Toggle } from "./ui/toggle";
 import { TooltipWrapper } from "@/components/ui/tooltip";
+import { useTranslations } from "next-intl";
+import { chatTypeKey } from "@/i18n/labels";
 
 export default function ChatSelect({ disabled }: { disabled: boolean }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [archived, setArchived] = useState(false);
+  const t = useTranslations("chats");
   const {
     isLoading,
     handleQueryChange,
@@ -65,7 +68,7 @@ export default function ChatSelect({ disabled }: { disabled: boolean }) {
               </span>
             </div>
           ) : (
-            "Select chat ..."
+            t("select")
           )}
           <ChevronsUpDown className="opacity-50" />
         </Button>
@@ -74,7 +77,7 @@ export default function ChatSelect({ disabled }: { disabled: boolean }) {
         <Command shouldFilter={false}>
           <div className="flex w-full border-b">
             <TooltipWrapper
-              content={archived ? "Show main chats" : "Show archived chats"}
+              content={archived ? t("showMain") : t("showArchived")}
             >
               <Toggle
                 className="h-9 rounded-none border-r"
@@ -90,7 +93,7 @@ export default function ChatSelect({ disabled }: { disabled: boolean }) {
             </TooltipWrapper>
             <div className="flex-1">
               <CommandInput
-                placeholder="Search chat..."
+                placeholder={t("search")}
                 className="h-9"
                 value={search}
                 onValueChange={setSearch}
@@ -106,7 +109,7 @@ export default function ChatSelect({ disabled }: { disabled: boolean }) {
               </CommandLoading>
             )}
             <CommandEmpty>
-              {!isLoading && chats.length === 0 && "No chat found."}
+              {!isLoading && chats.length === 0 && t("empty")}
             </CommandEmpty>
             <CommandGroup>
               {chats.map((chat) => (
@@ -143,7 +146,10 @@ export default function ChatSelect({ disabled }: { disabled: boolean }) {
                         {(chat.name ?? "").length > 0 ? chat.name : chat.id}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        {chat.type} • {chat.unreadCount ?? 0} unread
+                        {(chatTypeKey(chat.type)
+                          ? t(`types.${chatTypeKey(chat.type)!}`)
+                          : chat.type)}{" "}
+                        • {t("unread", { count: chat.unreadCount ?? 0 })}
                       </span>
                     </div>
                   </div>

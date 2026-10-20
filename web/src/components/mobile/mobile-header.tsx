@@ -36,10 +36,13 @@ import { Toggle } from "@/components/ui/toggle";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useTelegramChat } from "@/hooks/use-telegram-chat";
 import { useSettings } from "@/hooks/use-settings";
+import { useTranslations } from "next-intl";
+import { useConnectionLabel, useTelegramStateLabel } from "@/i18n/labels";
 
 export function MobileHeader() {
   const { accountDownloadSpeed } = useWebsocket();
   const { settings } = useSettings();
+  const t = useTranslations("header");
   const [hidden, setHidden] = useState(false);
   const [lastScrollY, setLastScrollY] = useState(0);
 
@@ -81,7 +84,7 @@ export function MobileHeader() {
               <Download className="h-4 w-4 flex-shrink-0" />
             </div>
           ) : (
-            <h3 className="text-lg font-semibold">Telegram File Manager</h3>
+            <h3 className="text-lg font-semibold">{t("appName")}</h3>
           )}
 
           <MenuDrawer />
@@ -100,6 +103,10 @@ function MenuDrawer() {
     "telegramFileLayout",
     "detailed",
   );
+  const t = useTranslations("header");
+  const tc = useTranslations("connection");
+  const connectionLabel = useConnectionLabel();
+  const telegramStateLabel = useTelegramStateLabel();
 
   return (
     <Drawer
@@ -123,7 +130,7 @@ function MenuDrawer() {
         >
           <div className="flex h-full w-full grow flex-col rounded-[16px] bg-white p-4 shadow-lg dark:bg-zinc-900">
             <DrawerTitle className="mb-6 text-center">
-              Telegram Files Manager
+              {t("manager")}
             </DrawerTitle>
             <div className="flex h-full flex-col justify-between">
               <div className="flex flex-1 flex-col gap-4">
@@ -133,7 +140,7 @@ function MenuDrawer() {
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col">
                   <Label className="text-xs font-semibold text-muted-foreground">
-                    Auto Download
+                    {t("autoDownload")}
                   </Label>
                   <div className="py-2">
                     {chat ? (
@@ -144,14 +151,14 @@ function MenuDrawer() {
                         className="w-full"
                         disabled={true}
                       >
-                        No chat selected
+                        {t("noChat")}
                       </Button>
                     )}
                   </div>
                 </div>
                 <div className="flex flex-col">
                   <Label className="text-xs font-semibold text-muted-foreground">
-                    Layout
+                    {t("layout")}
                   </Label>
                   <div className="py-2">
                     <Toggle
@@ -164,12 +171,12 @@ function MenuDrawer() {
                       {layout === "detailed" ? (
                         <>
                           <List className="h-4 w-4" />
-                          <span className="">Detailed Layout</span>
+                          <span className="">{t("detailed")}</span>
                         </>
                       ) : (
                         <>
                           <GalleryHorizontal className="h-4 w-4" />
-                          <span className="">Gallery Layout</span>
+                          <span className="">{t("gallery")}</span>
                         </>
                       )}
                     </Toggle>
@@ -189,7 +196,7 @@ function MenuDrawer() {
                     tabIndex={connectionStatus !== "Open" ? 0 : undefined}
                     aria-label={
                       connectionStatus !== "Open"
-                        ? "Reconnect live updates"
+                        ? tc("reconnect")
                         : undefined
                     }
                     onClick={
@@ -211,14 +218,16 @@ function MenuDrawer() {
                     ) : (
                       <UnplugIcon className="mr-1 h-4 w-4" />
                     )}
-                    {connectionStatus}
+                    {connectionLabel(connectionStatus)}
                   </Badge>
 
                   {telegramConnectionState &&
                     telegramConnectionState !== "ready" && (
                       <Badge variant="secondary">
                         <UnplugIcon className="mr-1 h-4 w-4" />
-                        Telegram: {telegramConnectionState}
+                        {tc("telegramPrefix", {
+                          state: telegramStateLabel(telegramConnectionState),
+                        })}
                       </Badge>
                     )}
                 </div>

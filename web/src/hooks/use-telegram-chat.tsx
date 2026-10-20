@@ -6,6 +6,7 @@ import { type TelegramChat } from "@/lib/types";
 import useSWR from "swr";
 import { useDebouncedCallback } from "use-debounce";
 import { type KeyedMutator } from "swr/_internal";
+import { useTranslations } from "next-intl";
 
 interface TelegramChatContextType {
   isLoading: boolean;
@@ -35,6 +36,7 @@ export const TelegramChatProvider: React.FC<TelegramChatProviderProps> = ({
   const [archived, setArchived] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const t = useTranslations("chats");
   const searchParams = useSearchParams();
   const accountId = searchParams.get("id") ?? "";
   const chatId = searchParams.get("chatId") ?? "";
@@ -62,7 +64,7 @@ export const TelegramChatProvider: React.FC<TelegramChatProviderProps> = ({
     }
     const chat = chats?.find((c) => c.id === newChatId);
     if (!chat) {
-      toast({ variant: "error", description: "Failed to switch chat" });
+      toast({ variant: "error", description: t("switchFailed") });
       return;
     }
     router.push(`/accounts?id=${accountId}&chatId=${newChatId}`);

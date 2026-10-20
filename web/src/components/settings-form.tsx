@@ -19,6 +19,16 @@ import TimeRangeSelector from "@/components/ui/time-range-selector";
 import { Switch } from "@/components/ui/switch";
 import { type SettingKey } from "@/lib/types";
 import { request } from "@/lib/api";
+import { useTranslations } from "next-intl";
+import {
+  DEFAULT_LOCALE,
+  LOCALE_STORAGE_KEY,
+  isLocale,
+  useSetLocale,
+  type AppLocale,
+} from "@/i18n/provider";
+import { useLocalStorage } from "@/hooks/use-local-storage";
+import { translatePreviewError } from "@/i18n/labels";
 
 type RcloneSettings = {
   enabled: boolean;
@@ -66,13 +76,23 @@ export default function SettingsForm() {
   const { settings, setSetting, updateSettings } = useSettings();
   const { account } = useTelegramAccount();
   const [, copyToClipboard] = useCopyToClipboard();
+  const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
+  const tType = useTranslations("fileType");
+  const tErrors = useTranslations("settings.errors");
+  const setLocale = useSetLocale();
+  const [storedLocale] = useLocalStorage<AppLocale>(
+    LOCALE_STORAGE_KEY,
+    DEFAULT_LOCALE,
+  );
+  const locale = isLocale(storedLocale) ? storedLocale : DEFAULT_LOCALE;
 
   const avgSpeedIntervalOptions = [
-    { value: "60", label: "1 minute" },
-    { value: "300", label: "5 minutes" },
-    { value: "600", label: "10 minutes" },
-    { value: "900", label: "15 minutes" },
-    { value: "1800", label: "30 minutes" },
+    { value: "60", label: t("intervals.60") },
+    { value: "300", label: t("intervals.300") },
+    { value: "600", label: t("intervals.600") },
+    { value: "900", label: t("intervals.900") },
+    { value: "1800", label: t("intervals.1800") },
   ];
 
   const rclone = parseRclone(settings?.rclone);
@@ -99,12 +119,15 @@ export default function SettingsForm() {
         .then((result) => setPathPreview(result))
         .catch((error: unknown) =>
           setPathPreview({
-            error: error instanceof Error ? error.message : "Preview failed",
+            error:
+              error instanceof Error
+                ? translatePreviewError(error.message, tErrors)
+                : t("previewFailed"),
           }),
         );
     }, 250);
     return () => window.clearTimeout(handle);
-  }, [account?.id, rclone.remote, rclone.pathTemplate, rclone.timeZone]);
+  }, [account?.id, rclone.remote, rclone.pathTemplate, rclone.timeZone, t, tErrors]);
 
   const updateRclone = (patch: Partial<RcloneSettings>) => {
     void setSetting("rclone", JSON.stringify({ ...rclone, ...patch }));
@@ -132,10 +155,28 @@ export default function SettingsForm() {
       <div className="no-scrollbar flex flex-col space-y-4 overflow-y-scroll">
         <p className="rounded-md bg-gray-50 p-2 text-sm text-muted-foreground dark:bg-gray-700">
           <Bell className="mr-2 inline-block h-4 w-4" />
-          These settings will be applied to all accounts.
+          {t("appliedToAll")}
         </p>
+        <div className="flex w-full flex-col space-y-2 rounded-md border p-4 shadow">
+          <Label htmlFor="ui-language">{t("language")}</Label>
+          <Select
+            value={locale}
+            onValueChange={(value) => {
+              if (isLocale(value)) setLocale(value);
+            }}
+          >
+            <SelectTrigger id="ui-language">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="zh-CN">{t("zhCN")}</SelectItem>
+              <SelectItem value="en">{t("en")}</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">{t("languageHint")}</p>
+        </div>
         <div className="w-full rounded-md border p-4 shadow">
-          <p className="mb-1 text-xs text-muted-foreground">Your root path</p>
+          <p className="mb-1 text-xs text-muted-foreground">{t("rootPath")}</p>
           <div className="flex items-center justify-between space-x-1">
             <p className="rounded-md bg-gray-50 p-2 text-xs text-muted-foreground dark:bg-gray-700">
               {account?.rootPath}
@@ -149,12 +190,13 @@ export default function SettingsForm() {
               }}
             >
               <Copy className="h-4 w-4" />
+              <span className="sr-only">{t("copyPath")}</span>
             </Button>
           </div>
         </div>
         <div className="flex w-full cursor-pointer flex-col space-y-4 rounded-md border p-4 shadow">
           <div className="flex items-center justify-between">
-            <Label>Speed Units</Label>
+            <Label>{t("speedUnits")}</Label>
             <RadioGroup
               value={settings?.speedUnits || "bits"}
               onValueChange={(v) => void setSetting("speedUnits", v)}
@@ -162,7 +204,7 @@ export default function SettingsForm() {
               data-state={settings?.speedUnits || "bits"}
             >
               <label className="inline-flex cursor-pointer items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 group-data-[state=bits]:bg-background group-data-[state=bits]:text-foreground group-data-[state=bits]:shadow">
-                bits
+                {tCommon("bits")}
                 <RadioGroupItem
                   id="enspeedUnits-bits"
                   value="bits"
@@ -170,7 +212,7 @@ export default function SettingsForm() {
                 />
               </label>
               <label className="inline-flex cursor-pointer items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 group-data-[state=bytes]:bg-background group-data-[state=bytes]:text-foreground group-data-[state=bytes]:shadow">
-                bytes
+                {tCommon("bytes")}
                 <RadioGroupItem
                   id="speedUnits-bytes"
                   value="bytes"
@@ -185,7 +227,7 @@ export default function SettingsForm() {
           onClick={(event) => handleSwitchChange("uniqueOnly", event)}
         >
           <div className="flex items-center justify-between">
-            <Label>Unique Only</Label>
+            <Label>{t("uniqueOnly")}</Label>
             <Switch
               id="unique-only"
               checked={settings?.uniqueOnly === "true"}
@@ -193,10 +235,8 @@ export default function SettingsForm() {
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            Show only unique file in the table. If disabled, will show all.{" "}
-            <br />
-            <strong>Warning:</strong> If enabled, the number of documents on the
-            form will be inaccurate.
+            {t("uniqueOnlyHint")} <br />
+            <strong>{t("uniqueOnlyWarning")}</strong> {t("uniqueOnlyWarningBody")}
           </p>
         </div>
         <div className="flex w-full flex-col space-y-4 rounded-md border p-4 shadow">
@@ -205,7 +245,7 @@ export default function SettingsForm() {
             onClick={(event) => handleSwitchChange("alwaysHide", event)}
           >
             <div className="flex items-center justify-between">
-              <Label>Always Hide</Label>
+              <Label>{t("alwaysHide")}</Label>
               <Switch
                 id="always-hide"
                 checked={settings?.alwaysHide === "true"}
@@ -213,7 +253,7 @@ export default function SettingsForm() {
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Always hide content and extra info in the table.
+              {t("alwaysHideHint")}
             </p>
           </div>
           {settings?.alwaysHide === "false" && (
@@ -224,7 +264,7 @@ export default function SettingsForm() {
               }
             >
               <div className="flex items-center justify-between">
-                <Label>Show Sensitive Content</Label>
+                <Label>{t("showSensitive")}</Label>
                 <Switch
                   id="show-sensitive-content"
                   checked={settings?.showSensitiveContent === "true"}
@@ -234,17 +274,16 @@ export default function SettingsForm() {
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                Show sensitive content in the table, Will use a spoiler to hide
-                sensitive content if disabled.
+                {t("showSensitiveHint")}
               </p>
             </div>
           )}
         </div>
         <div className="flex w-full flex-col space-y-4 rounded-md border p-4 shadow">
-          <Label>Auto Download Settings</Label>
+          <Label>{t("autoDownload")}</Label>
           <div className="flex flex-col space-y-4">
             <div className="flex items-center justify-between">
-              <Label htmlFor="limit">Limit Per Account</Label>
+              <Label htmlFor="limit">{t("limitPerAccount")}</Label>
               <span className="text-muted-foreground">
                 {settings?.autoDownloadLimit ?? 5} / 10
               </span>
@@ -260,19 +299,17 @@ export default function SettingsForm() {
               className="w-full"
             />
             <p className="text-xs text-muted-foreground">
-              The maximum number of files to download per account. <br />
-              This is useful for limiting the number of concurrent downloads.
-              Including the number of downloads you manually.
+              {t("limitHint")}
             </p>
           </div>
           <div className="flex flex-col space-y-4">
-            <Label htmlFor="avg-speed-interval">Avg Speed Interval</Label>
+            <Label htmlFor="avg-speed-interval">{t("avgSpeedInterval")}</Label>
             <Select
               value={String(settings?.avgSpeedInterval)}
               onValueChange={(v) => void setSetting("avgSpeedInterval", v)}
             >
               <SelectTrigger id="avg-speed-interval">
-                <SelectValue placeholder="Select Avg Speed Interval" />
+                <SelectValue placeholder={t("avgSpeedPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
                 {avgSpeedIntervalOptions.map((option) => (
@@ -283,12 +320,11 @@ export default function SettingsForm() {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              The interval to calculate the average download speed. <br />
-              Longer intervals may consume more memory.
+              {t("avgSpeedHint")}
             </p>
           </div>
           <div className="flex flex-col space-y-4">
-            <Label htmlFor="time-limited">Time Limited</Label>
+            <Label htmlFor="time-limited">{t("timeLimited")}</Label>
             <TimeRangeSelector
               startRequired={true}
               endRequired={true}
@@ -313,16 +349,13 @@ export default function SettingsForm() {
               className="max-w-md"
             />
             <p className="text-xs text-muted-foreground">
-              The time range for the download. Start and end times are required.{" "}
-              <br />
-              If you don&#39;t want to set a time range, you can set the start
-              and end to 00:00.
+              {t("timeLimitedHint")}
             </p>
           </div>
         </div>
         <div className="flex w-full flex-col space-y-4 rounded-md border p-4 shadow">
           <div className="flex items-center justify-between">
-            <Label htmlFor="rclone-enabled">Rclone upload</Label>
+            <Label htmlFor="rclone-enabled">{t("rcloneTitle")}</Label>
             <Switch
               id="rclone-enabled"
               checked={rclone.enabled}
@@ -330,12 +363,10 @@ export default function SettingsForm() {
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            Optional. Off by default. After a file is downloaded, copy or move
-            it with rclone (for example to Google Drive) without blocking the
-            download. Files already uploaded are skipped.
+            {t("rcloneHint")}
           </p>
           <div className="flex flex-col space-y-2">
-            <Label htmlFor="rclone-remote">Remote path</Label>
+            <Label htmlFor="rclone-remote">{t("remotePath")}</Label>
             <Input
               id="rclone-remote"
               value={rclone.remote}
@@ -343,12 +374,11 @@ export default function SettingsForm() {
               onChange={(event) => updateRclone({ remote: event.target.value })}
             />
             <p className="text-xs text-muted-foreground">
-              Destination remote, for example <code>googledrive:WC/CC</code>.
-              The path under it comes from the template below.
+              {t("remoteHint")}
             </p>
           </div>
           <div className="flex flex-col space-y-2">
-            <Label htmlFor="rclone-template">Path template</Label>
+            <Label htmlFor="rclone-template">{t("pathTemplate")}</Label>
             <Input
               id="rclone-template"
               value={rclone.pathTemplate}
@@ -358,18 +388,17 @@ export default function SettingsForm() {
               }
             />
             <p className="text-xs text-muted-foreground">
-              Placeholders: <code>{"{date:yyyyMMdd}"}</code>,{" "}
+              {t("pathTemplateIntro")}{" "}
+              <code>{"{date:yyyyMMdd}"}</code>,{" "}
               <code>{"{date:yyyy-MM-dd}"}</code>, <code>{"{accountName}"}</code>,{" "}
               <code>{"{accountUsername}"}</code>, <code>{"{accountId}"}</code>,{" "}
               <code>{"{chatTitle}"}</code>, <code>{"{chatId}"}</code>,{" "}
               <code>{"{messageId}"}</code>, <code>{"{type}"}</code>,{" "}
-              <code>{"{fileName}"}</code>. Date uses the download completion
-              time. The default keeps{" "}
-              <code>remote/chatId/messageId/fileName</code>.
+              <code>{"{fileName}"}</code>. {t("pathTemplateDate")}
             </p>
           </div>
           <div className="flex flex-col space-y-2">
-            <Label htmlFor="rclone-timezone">Date timezone</Label>
+            <Label htmlFor="rclone-timezone">{t("dateTimezone")}</Label>
             <Input
               id="rclone-timezone"
               value={rclone.timeZone}
@@ -379,14 +408,15 @@ export default function SettingsForm() {
               }
             />
             <p className="text-xs text-muted-foreground">
-              IANA zone id. Leave empty to use the container <code>TZ</code>{" "}
-              variable, or Asia/Shanghai when <code>TZ</code> is unset.
+              {t("timezoneHint")}
             </p>
           </div>
           <div className="rounded-md bg-gray-50 p-2 text-xs dark:bg-gray-700">
-            <p className="text-muted-foreground">Preview</p>
+            <p className="text-muted-foreground">{t("preview")}</p>
             {pathPreview?.error ? (
-              <p className="mt-1 break-all text-red-600">{pathPreview.error}</p>
+              <p className="mt-1 break-all text-red-600">
+                {translatePreviewError(pathPreview.error, tErrors)}
+              </p>
             ) : (
               <p className="mt-1 break-all font-mono">
                 {pathPreview?.destination ?? "…"}
@@ -394,22 +424,27 @@ export default function SettingsForm() {
             )}
             <p className="mt-1 text-muted-foreground">
               {pathPreview?.usingAccount
-                ? `Account ${pathPreview.accountName || pathPreview.accountUsername}${
-                    pathPreview.accountUsername &&
-                    pathPreview.accountUsername !== String(account?.id)
-                      ? ` (@${pathPreview.accountUsername})`
-                      : ""
-                  }. `
-                : "No account selected, so the preview uses a sample name. "}
-              Chat and file name are samples. Time zone{" "}
-              {pathPreview?.timeZone ?? "…"}. Styled letters in the account
-              name are kept. If two files render the same path, rclone writes
-              that exact name: an identical remote file is skipped, and a
-              different file replaces it.
+                ? t("previewAccount", {
+                    name:
+                      pathPreview.accountName ||
+                      pathPreview.accountUsername ||
+                      "",
+                    username:
+                      pathPreview.accountUsername &&
+                      pathPreview.accountUsername !== String(account?.id)
+                        ? t("previewUsername", {
+                            username: pathPreview.accountUsername,
+                          })
+                        : "",
+                  })
+                : t("previewNoAccount")}
+              {t("previewSamples", {
+                zone: pathPreview?.timeZone ?? "…",
+              })}
             </p>
           </div>
           <div className="flex flex-col space-y-2">
-            <Label htmlFor="rclone-config">rclone config file</Label>
+            <Label htmlFor="rclone-config">{t("configFile")}</Label>
             <Input
               id="rclone-config"
               value={rclone.configPath}
@@ -420,7 +455,7 @@ export default function SettingsForm() {
             />
           </div>
           <div className="flex flex-col space-y-2">
-            <Label htmlFor="rclone-flags">Extra flags</Label>
+            <Label htmlFor="rclone-flags">{t("extraFlags")}</Label>
             <Input
               id="rclone-flags"
               value={rclone.extraFlags}
@@ -431,7 +466,7 @@ export default function SettingsForm() {
             />
           </div>
           <div className="flex flex-col space-y-2">
-            <Label>Operation</Label>
+            <Label>{t("operation")}</Label>
             <RadioGroup
               value={rclone.operation}
               onValueChange={(value) =>
@@ -441,16 +476,16 @@ export default function SettingsForm() {
             >
               <label className="flex items-center gap-2 text-sm">
                 <RadioGroupItem value="copy" id="rclone-copy" />
-                Copy
+                {t("copy")}
               </label>
               <label className="flex items-center gap-2 text-sm">
                 <RadioGroupItem value="move" id="rclone-move" />
-                Move (delete local after success)
+                {t("move")}
               </label>
             </RadioGroup>
           </div>
           <div className="flex flex-col space-y-2">
-            <Label>When to upload</Label>
+            <Label>{t("when")}</Label>
             <RadioGroup
               value={rclone.mode}
               onValueChange={(value) =>
@@ -460,11 +495,11 @@ export default function SettingsForm() {
             >
               <label className="flex items-center gap-2 text-sm">
                 <RadioGroupItem value="immediate" id="rclone-immediate" />
-                Immediately after each download completes
+                {t("immediate")}
               </label>
               <label className="flex items-center gap-2 text-sm">
                 <RadioGroupItem value="scheduled" id="rclone-scheduled" />
-                Scheduled
+                {t("scheduled")}
               </label>
             </RadioGroup>
             {rclone.mode === "scheduled" && (
@@ -478,14 +513,11 @@ export default function SettingsForm() {
               />
             )}
             <p className="text-xs text-muted-foreground">
-              Schedule is a number of seconds (minimum 30) or a 5-field cron
-              expression, for example <code>0 */6 * * *</code>. Scheduled mode
-              uploads every completed file that matches the filter and has not
-              been uploaded yet.
+              {t("scheduleHint")}
             </p>
           </div>
           <div className="flex flex-col space-y-2">
-            <Label>File types</Label>
+            <Label>{t("fileTypes")}</Label>
             <div className="flex flex-wrap gap-3">
               {RCLONE_FILE_TYPES.map((type) => {
                 const selected = rclone.fileTypes
@@ -511,18 +543,18 @@ export default function SettingsForm() {
                         });
                       }}
                     />
-                    {type}
+                    {tType(type)}
                   </label>
                 );
               })}
             </div>
             <p className="text-xs text-muted-foreground">
-              Defaults to videos. Leave a type unchecked to skip it.
+              {t("fileTypesHint")}
             </p>
           </div>
         </div>
         <div className="flex w-full flex-col space-y-4 rounded-md border p-4 shadow">
-          <Label>Tags Settings</Label>
+          <Label>{t("tags")}</Label>
           <div className="flex flex-col space-y-4">
             <TagsInput
               maxTags={20}
@@ -539,11 +571,11 @@ export default function SettingsForm() {
       <DialogFooter className="mt-2 flex-1 gap-2">
         <DialogClose asChild>
           <Button className="w-full md:w-auto" variant="outline" type="button">
-            Cancel
+            {tCommon("cancel")}
           </Button>
         </DialogClose>
         <Button className="w-full md:w-auto" type="submit">
-          Submit
+          {tCommon("submit")}
         </Button>
       </DialogFooter>
     </form>

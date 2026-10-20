@@ -22,6 +22,9 @@ import {
 } from "./ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { BatchFileTags } from "@/components/file-tags";
+import { useTranslations } from "next-intl";
+
+type BatchAction = "download" | "continue" | "pause" | "cancel" | "delete";
 
 interface FileBatchControlProps {
   selectedFiles: Set<number>;
@@ -39,6 +42,8 @@ export default function FileBatchControl({
   files,
   updateField,
 }: FileBatchControlProps) {
+  const t = useTranslations("files");
+  const tb = useTranslations("files.batch");
   const selectedFileObjects = Array.from(selectedFiles)
     .map((id) => files.find((f) => f.id === id))
     .filter(Boolean) as TelegramFile[];
@@ -61,11 +66,22 @@ export default function FileBatchControl({
   ).length;
   const loadedFiles = selectedFileObjects.filter((file) => file.loaded);
 
-  const controlButtons = [
+  const controlButtons: Array<{
+    url: string;
+    action: BatchAction;
+    label: string;
+    tooltip: string;
+    className?: string;
+    icon: React.ReactNode;
+    filter: (file: TelegramFile) => boolean;
+    validCount: number;
+    showConfirm: boolean;
+  }> = [
     {
       url: "/files/start-download-multiple",
-      label: "Download",
-      tooltip: `Download ${downloadableCounts} selected files`,
+      action: "download",
+      label: tb("download"),
+      tooltip: tb("tooltipDownload", { count: downloadableCounts }),
       icon: <Download className="mr-2 h-4 w-4" />,
       filter: (file: TelegramFile) => file.downloadStatus === "idle",
       validCount: downloadableCounts,
@@ -73,8 +89,9 @@ export default function FileBatchControl({
     },
     {
       url: "/files/toggle-pause-download-multiple",
-      label: "Continue",
-      tooltip: `Continue ${continuableCounts} paused downloads`,
+      action: "continue",
+      label: tb("continue"),
+      tooltip: tb("tooltipContinue", { count: continuableCounts }),
       className: "bg-green-500 hover:bg-green-600 text-white",
       icon: <StepForward className="mr-2 h-4 w-4" />,
       filter: (file: TelegramFile) => file.downloadStatus === "paused",
@@ -83,8 +100,9 @@ export default function FileBatchControl({
     },
     {
       url: "/files/toggle-pause-download-multiple",
-      label: "Pause",
-      tooltip: `Pause ${pausableCounts} active downloads`,
+      action: "pause",
+      label: tb("pause"),
+      tooltip: tb("tooltipPause", { count: pausableCounts }),
       className: "bg-yellow-500 hover:bg-yellow-600 text-white",
       icon: <Pause className="mr-2 h-4 w-4" />,
       filter: (file: TelegramFile) => file.downloadStatus === "downloading",
@@ -93,8 +111,9 @@ export default function FileBatchControl({
     },
     {
       url: "/files/cancel-download-multiple",
-      label: "Cancel",
-      tooltip: `Cancel ${cancelableCounts} active downloads`,
+      action: "cancel",
+      label: tb("cancel"),
+      tooltip: tb("tooltipCancel", { count: cancelableCounts }),
       className: "bg-red-500 hover:bg-red-600 text-white",
       icon: <SquareX className="mr-2 h-4 w-4" />,
       filter: (file: TelegramFile) => file.downloadStatus === "downloading",
@@ -103,8 +122,9 @@ export default function FileBatchControl({
     },
     {
       url: "/files/remove-multiple",
-      label: "Delete",
-      tooltip: `Delete ${deletableCounts} completed files`,
+      action: "delete",
+      label: tb("delete"),
+      tooltip: tb("tooltipDelete", { count: deletableCounts }),
       className: "bg-red-500 hover:bg-red-600 text-white",
       icon: <FileX className="mr-2 h-4 w-4" />,
       filter: (file: TelegramFile) => file.downloadStatus === "completed",
@@ -133,8 +153,7 @@ export default function FileBatchControl({
       {selectedFiles.size > 0 && (
         <div className="flex flex-col rounded-lg bg-muted/50 p-4 transition-all duration-300 animate-in slide-in-from-bottom-2 md:flex-row md:items-center md:justify-between">
           <span className="mb-3 text-sm font-medium md:mb-0">
-            {selectedFiles.size} {selectedFiles.size === 1 ? "file" : "files"}{" "}
-            selected
+            {t("selected", { count: selectedFiles.size })}
           </span>
           <div className="flex flex-wrap gap-2">
             {loadedFiles.length > 0 && (
@@ -145,7 +164,7 @@ export default function FileBatchControl({
             )}
             {visibleButtons.map((button) => (
               <ControlButton
-                key={button.label}
+                key={button.action}
                 selectedFiles={selectedFiles}
                 setSelectedFiles={setSelectedFiles}
                 files={files}
@@ -157,7 +176,7 @@ export default function FileBatchControl({
               variant="outline"
               onClick={() => setSelectedFiles(new Set())}
             >
-              Clear Selection
+              {t("clearSelection")}
             </Button>
           </div>
         </div>
@@ -168,6 +187,7 @@ export default function FileBatchControl({
 
 interface ControlButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   url: string;
+  action: BatchAction;
   label: string;
   icon: React.ReactNode;
   tooltip: string;
@@ -183,6 +203,7 @@ interface ControlButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 function ControlButton({
   url,
+  action,
   label,
   icon,
   tooltip,
@@ -195,6 +216,8 @@ function ControlButton({
   setSelectedFiles,
   files,
 }: ControlButtonProps) {
+  const tb = useTranslations("files.batch");
+  const tc = useTranslations("common");
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
   const selectedFileObjects = Array.from(selectedFiles)
@@ -227,8 +250,8 @@ function ControlButton({
       onSuccess: () => {
         setSelectedFiles(new Set());
         toast({
-          title: `${label} action completed`,
-          description: `Successfully processed ${validFiles.length} files.`,
+          title: tb("completed", { action: label }),
+          description: tb("processed", { count: validFiles.length }),
           variant: "success",
         });
       },
@@ -284,22 +307,22 @@ function ControlButton({
         <DialogContent className="max-w-xl sm:max-w-md">
           <DialogHeader className="space-y-2">
             <DialogTitle className="text-center text-xl font-semibold">
-              {`Confirm ${label} Action`}
+              {tb("confirm", { action: label })}
             </DialogTitle>
             <div className="flex justify-center">
-              {label === "Delete" ? (
+              {action === "delete" ? (
                 <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/30">
                   <FileX className="h-6 w-6 text-red-600 dark:text-red-400" />
                 </div>
-              ) : label === "Cancel" ? (
+              ) : action === "cancel" ? (
                 <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/30">
                   <SquareX className="h-6 w-6 text-red-600 dark:text-red-400" />
                 </div>
-              ) : label === "Download" ? (
+              ) : action === "download" ? (
                 <div className="rounded-full bg-blue-100 p-3 dark:bg-blue-900/30">
                   <Download className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
-              ) : label === "Continue" ? (
+              ) : action === "continue" ? (
                 <div className="rounded-full bg-green-100 p-3 dark:bg-green-900/30">
                   <StepForward className="h-6 w-6 text-green-600 dark:text-green-400" />
                 </div>
@@ -313,7 +336,7 @@ function ControlButton({
 
           <div className="pb-6 pt-2">
             <p className="mb-3 text-center text-sm text-muted-foreground">
-              Are you sure you want to {label.toLowerCase()} the selected files?
+              {tb("confirmBody", { action: label })}
             </p>
 
             <div className="mt-4 flex flex-col gap-3">
@@ -321,7 +344,7 @@ function ControlButton({
                 <div className="overflow-hidden rounded-lg border border-green-200 dark:border-green-800">
                   <div className="border-b border-green-200 bg-green-50 px-4 py-2 dark:border-green-800 dark:bg-green-900/20">
                     <span className="text-sm font-medium text-green-800 dark:text-green-300">
-                      Files to process
+                      {tb("toProcess")}
                     </span>
                   </div>
                   <div className="flex items-center bg-white p-4 dark:bg-background">
@@ -332,11 +355,10 @@ function ControlButton({
                     </div>
                     <div>
                       <p className="text-sm font-medium">
-                        {validCount} {validCount === 1 ? "file" : "files"} will
-                        be processed
+                        {tb("willProcess", { count: validCount })}
                       </p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        These files are in the correct state for this operation
+                        {tb("compatible")}
                       </p>
                     </div>
                   </div>
@@ -347,7 +369,7 @@ function ControlButton({
                 <div className="overflow-hidden rounded-lg border border-red-200 dark:border-red-800">
                   <div className="border-b border-red-200 bg-red-50 px-4 py-2 dark:border-red-800 dark:bg-red-900/20">
                     <span className="text-sm font-medium text-red-800 dark:text-red-300">
-                      Files that will be skipped
+                      {tb("skipped")}
                     </span>
                   </div>
                   <div className="flex items-center bg-white p-4 dark:bg-background">
@@ -358,12 +380,10 @@ function ControlButton({
                     </div>
                     <div>
                       <p className="text-sm font-medium">
-                        {invalidCount} {invalidCount === 1 ? "file" : "files"}{" "}
-                        cannot be processed
+                        {tb("cannotProcess", { count: invalidCount })}
                       </p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        These files are in an incompatible state for this
-                        operation
+                        {tb("incompatible")}
                       </p>
                     </div>
                   </div>
@@ -375,17 +395,17 @@ function ControlButton({
           <DialogFooter className="gap-3 sm:justify-center">
             <DialogClose asChild>
               <Button variant="outline" className="min-w-24">
-                Cancel
+                {tc("cancel")}
               </Button>
             </DialogClose>
             <Button
               onClick={handleAction}
               className={`min-w-24 ${
-                label === "Delete" || label === "Cancel"
+                action === "delete" || action === "cancel"
                   ? "bg-red-500 text-white hover:bg-red-600"
-                  : label === "Continue"
+                  : action === "continue"
                     ? "bg-green-500 text-white hover:bg-green-600"
-                    : label === "Pause"
+                    : action === "pause"
                       ? "bg-yellow-500 text-white hover:bg-yellow-600"
                       : ""
               }`}

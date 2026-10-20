@@ -10,12 +10,13 @@ import { env } from "@/env";
 import { TelegramAccountProvider } from "@/hooks/use-telegram-account";
 import { ThemeProvider } from "@/components/theme-provider";
 import { LocalStorageProvider } from "@/hooks/use-local-storage";
+import { I18nProvider } from "@/i18n/provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Telegram Files",
-  description: "Manage your files on Telegram",
+  title: "Telegram 文件",
+  description: "管理 Telegram 上的文件",
 };
 
 export default async function RootLayout({
@@ -24,7 +25,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="zh-CN" suppressHydrationWarning>
       <head>
         <link
           rel="icon"
@@ -50,6 +51,7 @@ export default async function RootLayout({
       </head>
       <body className={inter.className}>
         <LocalStorageProvider>
+          <I18nProvider>
           <ThemeProvider
             attribute="class"
             defaultTheme="light"
@@ -64,6 +66,7 @@ export default async function RootLayout({
             </SWRProvider>
             <Toaster />
           </ThemeProvider>
+          </I18nProvider>
         </LocalStorageProvider>
       </body>
     </html>

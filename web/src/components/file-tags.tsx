@@ -7,6 +7,7 @@ import { useSettings } from "@/hooks/use-settings";
 import useSWRMutation from "swr/mutation";
 import { POST } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
+import { useTranslations } from "next-intl";
 import { useDebounce } from "use-debounce";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "./ui/hover-card";
 import * as HoverCardPrimitive from "@radix-ui/react-hover-card";
@@ -36,6 +37,7 @@ function useBatchUpdateTags({
   onTagsUpdate?: (tags: string[]) => void;
 }) {
   const [tags, setTags] = useState<string[]>([]);
+  const t = useTranslations("tags");
 
   useEffect(() => {
     const allTags = files.flatMap((file) => split(",", file.tags ?? ""));
@@ -66,7 +68,7 @@ function useBatchUpdateTags({
         onTagsUpdate?.(tags);
         toast({
           variant: "success",
-          description: "Tags updated successfully",
+          description: t("updated"),
         });
       },
     },
@@ -106,6 +108,7 @@ function useUpdateTags({
   onTagsUpdate?: (tags: string[]) => void;
 }) {
   const [tags, setTags] = useState<string[]>(split(",", file?.tags));
+  const t = useTranslations("tags");
 
   useEffect(() => {
     setTags(split(",", file.tags));
@@ -119,7 +122,7 @@ function useUpdateTags({
         onTagsUpdate?.(tags);
         toast({
           variant: "success",
-          description: "Tags updated successfully",
+          description: t("updated"),
         });
       },
     },
@@ -254,6 +257,8 @@ export function MobileFileTagsDrawer({
   onOpenChange,
 }: MobileFileTagsDrawerProps) {
   const { settings } = useSettings();
+  const t = useTranslations("tags");
+  const tCommon = useTranslations("common");
   const { tags, setTags, toggleUpdateTags, isMutating } = useUpdateTags({
     file,
     onTagsUpdate,
@@ -276,7 +281,7 @@ export function MobileFileTagsDrawer({
         <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
 
         <div className="p-4">
-          <DrawerTitle className="mb-4">Edit Tags</DrawerTitle>
+          <DrawerTitle className="mb-4">{t("edit")}</DrawerTitle>
           <TagsSelector
             value={tags}
             onChangeAction={setTags}
@@ -294,11 +299,11 @@ export function MobileFileTagsDrawer({
             {isMutating ? (
               <LoaderIcon className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />
             ) : (
-              "Submit"
+              tCommon("submit")
             )}
           </Button>
           <DrawerClose asChild>
-            <Button variant="outline">Close</Button>
+            <Button variant="outline">{tCommon("close")}</Button>
           </DrawerClose>
         </DrawerFooter>
       </DrawerContent>
@@ -314,6 +319,8 @@ interface BatchFileTagsProps {
 export function BatchFileTags({ files, onTagsUpdate }: BatchFileTagsProps) {
   const { settings } = useSettings();
   const [open, setOpen] = useState(false);
+  const t = useTranslations("tags");
+  const tCommon = useTranslations("common");
   const { tags, setTags, toggleUpdateTags, isMutating } = useBatchUpdateTags({
     files,
     onTagsUpdate: handleTagsUpdate,
@@ -335,15 +342,13 @@ export function BatchFileTags({ files, onTagsUpdate }: BatchFileTagsProps) {
       <DialogTrigger asChild>
         <Button size="sm">
           <Tag className="mr-2 h-4 w-4" />
-          Edit Tags
-          {`(${files.length})`}
+          {t("batchEdit", { count: files.length })}
         </Button>
       </DialogTrigger>
       <DialogContent className="w-full max-w-md">
-        <DialogTitle>Edit Tags</DialogTitle>
+        <DialogTitle>{t("edit")}</DialogTitle>
         <DialogDescription>
-          {`You can edit tags for ${files.length} files at once. This will update the
-            tags for all selected files.`}
+          {t("batchHint", { count: files.length })}
         </DialogDescription>
         <TagsSelector
           value={tags}
@@ -352,13 +357,13 @@ export function BatchFileTags({ files, onTagsUpdate }: BatchFileTagsProps) {
         />
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">Close</Button>
+            <Button variant="outline">{tCommon("close")}</Button>
           </DialogClose>
           <Button onClick={() => toggleUpdateTags()}>
             {isMutating ? (
               <LoaderIcon className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />
             ) : (
-              "Submit"
+              tCommon("submit")
             )}
           </Button>
         </DialogFooter>

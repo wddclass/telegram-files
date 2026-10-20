@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import useIsMobile from "@/hooks/use-is-mobile";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { SafeBottomWrapper } from "@/components/safe-bottom-wrapper";
+import { useTranslations } from "next-intl";
 
 // 检测浏览器是否支持特定视频格式
 const checkVideoSupport = (mimeType: string): "probably" | "maybe" | "" => {
@@ -27,13 +28,11 @@ const checkVideoSupport = (mimeType: string): "probably" | "maybe" | "" => {
   return video.canPlayType(mimeType);
 };
 
-// Browser compatibility limited formats
-const BROWSER_LIMITED_FORMATS: Record<string, string> = {
-  "video/quicktime": "QuickTime format is recommended for Safari browser",
-  "video/mp2t":
-    "MPEG-TS format is not supported by browsers, please download and use VLC player",
-  "video/x-matroska": "MKV format has limited support in some browsers",
-};
+const LIMITED_FORMAT_KEYS = {
+  "video/quicktime": "quicktime",
+  "video/mp2t": "mpegts",
+  "video/x-matroska": "mkv",
+} as const;
 
 // 获取 MIME 类型
 const getMimeType = (file: TelegramFile): string => {
@@ -53,7 +52,10 @@ const getMimeType = (file: TelegramFile): string => {
 
 const VideoErrorFallback = ({
   className = "",
-  message = "Video loading failed!",
+  message,
+}: {
+  className?: string;
+  message: string;
 }) => (
   <div
     className={`flex flex-col items-center justify-center rounded bg-gray-100 p-4 ${className}`}
@@ -387,6 +389,7 @@ const FileVideo = ({
   const [error, setError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [formatWarning, setFormatWarning] = useState<string | null>(null);
+  const t = useTranslations("video");
 
   const url = `${getApiUrl()}/${file.telegramId}/file/${file.uniqueId}`;
   const mimeType = getMimeType(file);
@@ -395,13 +398,15 @@ const FileVideo = ({
   useEffect(() => {
     const support = checkVideoSupport(mimeType);
 
-    if (support === "" && BROWSER_LIMITED_FORMATS[mimeType]) {
-      setFormatWarning(BROWSER_LIMITED_FORMATS[mimeType]);
+    const formatKey =
+      LIMITED_FORMAT_KEYS[mimeType as keyof typeof LIMITED_FORMAT_KEYS];
+    if (support === "" && formatKey) {
+      setFormatWarning(t(formatKey));
       console.warn(
         `Video format ${mimeType} may not be supported in current browser`,
       );
     }
-  }, [mimeType]);
+  }, [mimeType, t]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -544,26 +549,28 @@ const FileVideo = ({
       mimeType: mimeType,
     });
     // Set a user-friendly error message based on the error code
-    let message = "Video loading failed";
+    let message = t("loadFailed");
     if (videoElement.error) {
       switch (videoElement.error.code) {
         case 1:
-          message = "Playback aborted";
+          message = t("aborted");
           break;
         case 2:
-          message = "Network error";
+          message = t("network");
           break;
         case 3:
-          message = "Decode error";
+          message = t("decode");
           break;
-        case 4:
-          message = `Unsupported format (${mimeType})`;
-          if (BROWSER_LIMITED_FORMATS[mimeType]) {
-            message += ` - ${BROWSER_LIMITED_FORMATS[mimeType]}`;
-          }
+        case 4: {
+          const formatKey =
+            LIMITED_FORMAT_KEYS[mimeType as keyof typeof LIMITED_FORMAT_KEYS];
+          message = formatKey
+            ? `${mimeType} - ${t(formatKey)}`
+            : `${t("unknown")} (${mimeType})`;
           break;
+        }
         default:
-          message = "Unknown error";
+          message = t("unknown");
       }
     }
     setErrorMessage(message);
@@ -610,7 +617,7 @@ const FileVideo = ({
     return (
       <VideoErrorFallback
         className="h-full min-h-[200px] w-full"
-        message={errorMessage}
+        message={errorMessage || t("playbackFailed")}
       />
     );
   }

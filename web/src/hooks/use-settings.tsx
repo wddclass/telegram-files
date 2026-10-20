@@ -4,6 +4,7 @@ import useSWR from "swr";
 import { type SettingKey, SettingKeys, type Settings } from "@/lib/types";
 import { request } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
+import { useTranslations } from "next-intl";
 
 interface SettingsContextType {
   isLoading: boolean;
@@ -25,6 +26,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
   children,
   keys = [...SettingKeys],
 }) => {
+  const t = useTranslations("toast");
   const {
     data: settings,
     isLoading,
@@ -52,7 +54,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
       // @ts-expect-error
       await mutate((current) => ({ ...current, ...updates }), false);
     }
-    toast({ variant: "success", description: "Settings updated" });
+    toast({ variant: "success", description: t("settingsUpdated") });
   };
 
   const setSetting = async (key: SettingKey, value: string) => {

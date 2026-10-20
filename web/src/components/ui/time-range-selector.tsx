@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 
 interface TimeRangeSelectorProps {
@@ -32,6 +33,7 @@ const TimeRangeSelector = ({
   onTimeRangeChange,
   className,
 }: TimeRangeSelectorProps) => {
+  const t = useTranslations("time");
   // Time states
   const [startTime, setStartTime] = useState<TimeUnit | null>(
     startRequired ? parseTime(timeRange?.startTime) : null,
@@ -154,7 +156,7 @@ const TimeRangeSelector = ({
               )}
               onClick={() => handleTimeClick("start")}
             >
-              {startTime ? formatTime(startTime) : "Start Time"}
+              {startTime ? formatTime(startTime) : t("start")}
             </div>
 
             {/* Separator */}
@@ -171,7 +173,7 @@ const TimeRangeSelector = ({
               )}
               onClick={() => handleTimeClick("end")}
             >
-              {endTime ? formatTime(endTime) : "End Time"}
+              {endTime ? formatTime(endTime) : t("end")}
             </div>
 
             {/* Right padding */}
@@ -184,7 +186,7 @@ const TimeRangeSelector = ({
             {/* Hours column */}
             <div className="flex-1">
               <div className="mb-1 text-center text-xs text-muted-foreground">
-                Hour
+                {t("hour")}
               </div>
               {generateOptions(
                 24,
@@ -198,7 +200,7 @@ const TimeRangeSelector = ({
             {/* Minutes column */}
             <div className="flex-1">
               <div className="mb-1 text-center text-xs text-muted-foreground">
-                Min
+                {t("minute")}
               </div>
               {generateOptions(
                 60,
@@ -213,7 +215,7 @@ const TimeRangeSelector = ({
             {includeSeconds && (
               <div className="flex-1">
                 <div className="mb-1 text-center text-xs text-muted-foreground">
-                  Sec
+                  {t("second")}
                 </div>
                 {generateOptions(
                   60,

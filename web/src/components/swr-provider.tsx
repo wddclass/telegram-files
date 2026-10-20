@@ -3,9 +3,11 @@ import { SWRConfig } from "swr";
 import React from "react";
 import { useToast } from "@/hooks/use-toast";
 import { request, RequestParsedError } from "@/lib/api";
+import { useTranslations } from "next-intl";
 
 export const SWRProvider = ({ children }: { children: React.ReactNode }) => {
   const { toast } = useToast();
+  const t = useTranslations("toast");
   return (
     <SWRConfig
       value={{
@@ -36,11 +38,11 @@ export const SWRProvider = ({ children }: { children: React.ReactNode }) => {
 
           toast({
             variant: "error",
-            title: "Request Failed",
+            title: t("requestFailed"),
             description: (
               <div className="space-y-2">
                 <div className="line-clamp-2 break-all text-xs text-muted-foreground">
-                  <strong className="text-foreground">Key:</strong> {displayKey}
+                  <strong className="text-foreground">{t("key")}:</strong> {displayKey}
                 </div>
                 {isHtml ? (
                   message

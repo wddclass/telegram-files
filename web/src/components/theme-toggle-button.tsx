@@ -3,9 +3,11 @@
 import { Toggle } from "@/components/ui/toggle";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useTranslations } from "next-intl";
 
 export default function ThemeToggleButton() {
   const { theme, setTheme } = useTheme();
+  const t = useTranslations("theme");
 
   return (
     <div>
@@ -17,7 +19,7 @@ export default function ThemeToggleButton() {
         onPressedChange={() =>
           setTheme((prev) => (prev === "dark" ? "light" : "dark"))
         }
-        aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+        aria-label={theme === "dark" ? t("toLight") : t("toDark")}
       >
         <Moon
           size={16}

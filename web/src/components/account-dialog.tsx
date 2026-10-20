@@ -12,6 +12,7 @@ import { useTelegramAccount } from "@/hooks/use-telegram-account";
 import ProxysDialog from "@/components/proxys-dialog";
 import AccountCreator from "@/components/account-creator";
 import { toast } from "@/hooks/use-toast";
+import { useTranslations } from "next-intl";
 
 export function AccountDialog({
   children,
@@ -24,6 +25,7 @@ export function AccountDialog({
   const { account } = useTelegramAccount();
   const [newAccountId, setNewAccountId] = useState<string | undefined>();
   const [open, setOpen] = useState(false);
+  const t = useTranslations("accounts");
 
   useEffect(() => {
     if (account) {
@@ -49,7 +51,7 @@ export function AccountDialog({
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            Add Telegram Account
+            {t("addTitle")}
             {(account ?? newAccountId) && (
               <p className="rounded-md bg-gray-100 p-1 text-xs text-muted-foreground dark:bg-gray-800 dark:text-gray-300">
                 {account ? account.id : newAccountId}
@@ -74,8 +76,8 @@ export function AccountDialog({
                 toast({
                   variant: "success",
                   description: proxyName
-                    ? `Proxy is set to ${proxyName} with new account`
-                    : "Proxy is disabled",
+                    ? t("proxySet", { name: proxyName })
+                    : t("proxyDisabled"),
                 });
               }}
               enableSelect={true}

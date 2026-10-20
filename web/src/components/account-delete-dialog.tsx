@@ -16,6 +16,7 @@ import { useState } from "react";
 import { useSWRConfig } from "swr";
 import { useTelegramAccount } from "@/hooks/use-telegram-account";
 import { useDebounce } from "use-debounce";
+import { useTranslations } from "next-intl";
 
 export default function AccountDeleteDialog({
   telegramId,
@@ -25,13 +26,15 @@ export default function AccountDeleteDialog({
   className?: string;
 }) {
   const { toast } = useToast();
+  const t = useTranslations("accounts");
+  const tCommon = useTranslations("common");
   const [open, setOpen] = useState(false);
   const { mutate } = useSWRConfig();
   const { resetAccount } = useTelegramAccount();
   const { trigger: triggerDelete, isMutating: isDeleteMutating } =
     useSWRMutation(`/telegram/${telegramId}/delete`, POST, {
       onSuccess: () => {
-        toast({ variant: "success", title: "Account deleted successfully!" });
+        toast({ variant: "success", title: t("deleted") });
         resetAccount();
         // 延迟关闭对话框
         setTimeout(() => {
@@ -65,11 +68,10 @@ export default function AccountDeleteDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <DialogHeader>
-          <DialogTitle>Delete Telegram Account</DialogTitle>
+          <DialogTitle>{t("deleteTitle")}</DialogTitle>
         </DialogHeader>
         <DialogDescription>
-          Are you sure you want to delete your account? This action is
-          irreversible.
+          {t("deleteDescription")}
         </DialogDescription>
         <div className="flex justify-end gap-2">
           <Button
@@ -77,14 +79,14 @@ export default function AccountDeleteDialog({
             onClick={() => triggerDelete()}
             disabled={debounceIsDeleteMutating}
           >
-            {debounceIsDeleteMutating ? "Deleting..." : "Delete"}
+            {debounceIsDeleteMutating ? tCommon("deleting") : tCommon("delete")}
           </Button>
           <Button
             variant="outline"
             onClick={() => setOpen(false)}
             disabled={debounceIsDeleteMutating}
           >
-            Cancel
+            {tCommon("cancel")}
           </Button>
         </div>
       </DialogContent>

@@ -4,8 +4,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import ThemeToggleButton from "@/components/theme-toggle-button";
 import Link from "next/link";
 import TelegramIcon from "@/components/telegram-icon";
+import { useTranslations } from "next-intl";
 
 export default function AccountPage() {
+  const t = useTranslations("meta");
   return (
     <div className="container mx-auto px-4 py-6">
       <Card className="mb-6">
@@ -15,7 +17,7 @@ export default function AccountPage() {
               <TelegramIcon className="h-6 w-6" />
             </Link>
 
-            <h3 className="text-lg font-semibold">Telegram File Manager</h3>
+            <h3 className="text-lg font-semibold">{t("title")}</h3>
 
             <ThemeToggleButton />
           </div>

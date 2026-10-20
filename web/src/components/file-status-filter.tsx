@@ -15,6 +15,7 @@ import { useMemo } from "react";
 import { DOWNLOAD_STATUS, TRANSFER_STATUS } from "@/components/file-status";
 import useIsMobile from "@/hooks/use-is-mobile";
 import { Label } from "@/components/ui/label";
+import { useTranslations } from "next-intl";
 
 const statusOptions = {
   downloadStatus: {
@@ -42,6 +43,8 @@ export default function FileStatusFilter({
   onChange,
 }: FileStatusFilterProps) {
   const isMobile = useIsMobile();
+  const t = useTranslations("status");
+  const tf = useTranslations("filters");
   const [localDownloadStatus, setLocalDownloadStatus] = React.useState<
     DownloadStatus | undefined
   >(downloadStatus);
@@ -70,7 +73,7 @@ export default function FileStatusFilter({
 
   const statusDisplayValue = useMemo(() => {
     if (!localDownloadStatus && !localTransferStatus) {
-      return "Filter Status";
+      return t("filter");
     }
     const downloadStatus =
       localDownloadStatus && DOWNLOAD_STATUS[localDownloadStatus];
@@ -81,36 +84,38 @@ export default function FileStatusFilter({
       <div className="flex items-center space-x-2">
         {downloadStatus && (
           <div className="flex items-center space-x-1 rounded bg-gray-100 p-1 dark:bg-gray-800">
-            <span className="text-xs">Download</span>
+            <span className="text-xs">{t("downloadShort")}</span>
             <downloadStatus.icon className="h-3 w-3" />
           </div>
         )}
         {transferStatus && (
           <div className="flex items-center space-x-1 rounded bg-gray-100 p-1 dark:bg-gray-800">
-            <span className="text-xs">Transfer</span>
+            <span className="text-xs">{t("transferShort")}</span>
             <transferStatus.icon className="h-3 w-3" />
           </div>
         )}
       </div>
     );
-  }, [localDownloadStatus, localTransferStatus]);
+  }, [localDownloadStatus, localTransferStatus, t]);
 
   return (
     <div className="space-y-2">
-      <Label>Status</Label>
+      <Label>{tf("status")}</Label>
       <Select
         value={`${localDownloadStatus ?? ""}||${localTransferStatus ?? ""}`}
         onValueChange={(value) => handleStatusSelect(value)}
       >
         <SelectTrigger>
-          <SelectValue placeholder="Filter Status">
+          <SelectValue placeholder={t("filter")}>
             {statusDisplayValue}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {Object.entries(statusOptions).map(([groupKey, group]) => (
             <SelectGroup key={groupKey}>
-              <SelectLabel>{group.text}</SelectLabel>
+              <SelectLabel>
+                {groupKey === "downloadStatus" ? t("download") : t("transfer")}
+              </SelectLabel>
               {Object.entries(group.status).map(([statusKey, item]) => (
                 <SelectPrimitive.Item
                   key={`${groupKey}||${statusKey}`}
@@ -130,7 +135,11 @@ export default function FileStatusFilter({
                   <SelectPrimitive.ItemText>
                     <div className="flex items-center">
                       {item.icon && <item.icon className="mr-2 h-4 w-4" />}
-                      {item.text}
+                      {groupKey === "transferStatus" && statusKey === "completed"
+                        ? t("transferred")
+                        : groupKey === "transferStatus" && statusKey === "error"
+                          ? t("transferError")
+                          : t(statusKey)}
                     </div>
                   </SelectPrimitive.ItemText>
                 </SelectPrimitive.Item>

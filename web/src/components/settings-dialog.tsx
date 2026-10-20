@@ -18,10 +18,12 @@ import { ChartColumnIncreasingIcon } from "@/components/ui/chart-column-increasi
 import { LayoutPanelTopIcon } from "@/components/ui/layout-panel-top";
 import FilePhaseStatistics from "@/components/file-phase-statistics";
 import DebugTelegramMethod from "@/components/debug-telegram-method";
+import { useTranslations } from "next-intl";
 
 export const SettingsDialog: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { account, accountId } = useTelegramAccount();
+  const t = useTranslations("settings");
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -41,18 +43,18 @@ export const SettingsDialog: React.FC = () => {
         aria-describedby={undefined}
       >
         <VisuallyHidden>
-          <DialogTitle>Settings</DialogTitle>
+          <DialogTitle>{t("title")}</DialogTitle>
         </VisuallyHidden>
         <Tabs
           defaultValue="general"
           className="mt-3 flex h-full flex-col overflow-hidden"
         >
           <TabsList className="min-h-9 justify-start overflow-auto">
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="statistics">Statistics</TabsTrigger>
-            <TabsTrigger value="proxys">Proxys</TabsTrigger>
-            <TabsTrigger value="api">API</TabsTrigger>
-            <TabsTrigger value="about">About</TabsTrigger>
+            <TabsTrigger value="general">{t("tabs.general")}</TabsTrigger>
+            <TabsTrigger value="statistics">{t("tabs.statistics")}</TabsTrigger>
+            <TabsTrigger value="proxys">{t("tabs.proxys")}</TabsTrigger>
+            <TabsTrigger value="api">{t("tabs.api")}</TabsTrigger>
+            <TabsTrigger value="about">{t("tabs.about")}</TabsTrigger>
           </TabsList>
           <TabsContent value="general" className="overflow-hidden">
             <SettingsForm />
@@ -85,7 +87,7 @@ export const SettingsDialog: React.FC = () => {
               ) : (
                 <div className="flex flex-1 items-center justify-center">
                   <p className="text-lg text-muted-foreground">
-                    Please select an account to view statistics
+                    {t("selectAccount")}
                   </p>
                 </div>
               )}

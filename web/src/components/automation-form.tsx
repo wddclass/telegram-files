@@ -10,7 +10,7 @@ import {
   TransferPolices,
   type TransferPolicy,
 } from "@/lib/types";
-import React, { useId, useMemo, useState } from "react";
+import React, { useId, useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -48,6 +48,8 @@ import { useMutationObserver } from "@/hooks/use-mutation-observer";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { isFileTypeKey } from "@/i18n/labels";
 
 interface AutomationFormProps {
   auto: Auto;
@@ -58,11 +60,12 @@ export default function AutomationForm({
   auto,
   onChange,
 }: AutomationFormProps) {
+  const t = useTranslations("automation");
   return (
     <div className="space-y-4">
       <div className="space-y-4 rounded-md border border-gray-200 p-4 dark:border-gray-700">
         <div className="flex items-center justify-between">
-          <Label htmlFor="enable-preload">Enable Preload</Label>
+          <Label htmlFor="enable-preload">{t("enablePreload")}</Label>
           <Switch
             id="enable-preload"
             checked={auto.preload.enabled}
@@ -82,8 +85,7 @@ export default function AutomationForm({
             <div className="flex items-start">
               <span className="mr-3 mt-1.5 h-3 w-2 flex-shrink-0 rounded-full bg-cyan-400"></span>
               <p className="text-sm leading-6 text-gray-700 dark:text-gray-300">
-                This will enable preload for this chat. All files will be
-                loaded, but not downloaded, then you can search offline.
+                {t("preloadHint")}
               </p>
             </div>
           </div>
@@ -91,7 +93,7 @@ export default function AutomationForm({
       </div>
       <div className="space-y-4 rounded-md border border-gray-200 p-4 dark:border-gray-700">
         <div className="flex items-center justify-between">
-          <Label htmlFor="enable-auto-download">Enable Auto Download</Label>
+          <Label htmlFor="enable-auto-download">{t("enableDownload")}</Label>
           <Switch
             id="enable-auto-download"
             checked={auto.download.enabled}
@@ -112,24 +114,21 @@ export default function AutomationForm({
               <div className="flex items-start">
                 <span className="mr-3 mt-1.5 h-3 w-2 flex-shrink-0 rounded-full bg-cyan-400"></span>
                 <p className="text-sm leading-6 text-gray-700 dark:text-gray-300">
-                  This will enable auto download for this chat. Files will be
-                  downloaded automatically.
+                  {t("downloadHint")}
                 </p>
               </div>
               <div className="flex items-start">
                 <span className="mr-3 mt-1.5 h-3 w-2 flex-shrink-0 rounded-full bg-cyan-400"></span>
                 <p className="text-sm leading-6 text-gray-700 dark:text-gray-300">
-                  If you enable download history, the files in historical
-                  messages will be downloaded first, and then files in new
-                  messages will be downloaded automatically.
+                  {t("historyHint")}
                 </p>
               </div>
               <div className="flex items-start">
                 <span className="mr-3 mt-1.5 h-3 w-2 flex-shrink-0 rounded-full bg-cyan-400"></span>
                 <p className="text-sm leading-6 text-gray-700 dark:text-gray-300">
-                  Download Order:
+                  {t("order")}
                   <span className="ml-1 rounded bg-blue-100 px-2 text-blue-700 dark:bg-blue-800 dark:text-blue-200">
-                    {"Photo -> Video -> Audio -> File"}
+                    {t("orderValue")}
                   </span>
                 </p>
               </div>
@@ -151,7 +150,7 @@ export default function AutomationForm({
       </div>
       <div className="space-y-4 rounded-md border border-gray-200 p-4 dark:border-gray-700">
         <div className="flex items-center justify-between">
-          <Label htmlFor="enable-transfer">Enable Transfer</Label>
+          <Label htmlFor="enable-transfer">{t("enableTransfer")}</Label>
           <Switch
             id="enable-transfer"
             checked={auto.transfer.enabled}
@@ -172,8 +171,7 @@ export default function AutomationForm({
               <div className="flex items-start">
                 <span className="mr-3 mt-1.5 h-3 w-2 flex-shrink-0 rounded-full bg-cyan-400"></span>
                 <p className="text-sm leading-6 text-gray-700 dark:text-gray-300">
-                  This will enable auto transfer for this chat. Downloaded files
-                  will be transferred to the specified location automatically.
+                  {t("transferHint")}
                 </p>
               </div>
             </div>
@@ -202,6 +200,8 @@ interface DownloadRuleProps {
 }
 
 function DownloadRule({ value, onChange }: DownloadRuleProps) {
+  const t = useTranslations("automation");
+  const tType = useTranslations("fileType");
   const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange({
       ...value,
@@ -240,52 +240,52 @@ function DownloadRule({ value, onChange }: DownloadRuleProps) {
     <Accordion type="single" collapsible>
       <AccordionItem value="advanced">
         <AccordionTrigger className="hover:no-underline">
-          Advanced
+          {t("advanced")}
         </AccordionTrigger>
         <AccordionContent>
           <div className="flex flex-col space-y-4 rounded-md border p-4 shadow">
             <div className="flex flex-col space-y-2">
-              <Label htmlFor="query-keyword">Query Keyword</Label>
+              <Label htmlFor="query-keyword">{t("query")}</Label>
               <Input
                 id="query-keyword"
                 type="text"
                 className="w-full"
-                placeholder="Enter a keyword to filter files"
+                placeholder={t("queryPlaceholder")}
                 value={value.query}
                 onChange={handleQueryChange}
               />
             </div>
             <div className="flex flex-col space-y-2">
               <Label htmlFor="filter-expr">
-                Filter Expression
+                {t("filterExpr")}
                 <Link
                   href="https://github.com/jarvis2f/telegram-files/blob/main/misc/filter-expression-guide.md"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="ml-2 text-sm text-blue-600 hover:underline"
                 >
-                  (Learn more)
+                  {t("learnMore")}
                 </Link>
               </Label>
               <Textarea
                 id="filter-expr"
                 className="w-full"
-                placeholder="Enter a filter expression (e.g., str:contains(content.text.text, 'Hello') and id > 1000)"
+                placeholder={t("filterPlaceholder")}
                 value={value.filterExpr}
                 onChange={handleFilterExprChange}
               />
             </div>
 
             <div className="flex flex-col space-y-2">
-              <Label htmlFor="fileTypes">Filter File Types</Label>
+              <Label htmlFor="fileTypes">{t("fileTypes")}</Label>
               <Select onValueChange={handleFileTypeSelect}>
                 <SelectTrigger id="fileTypes">
-                  <SelectValue placeholder="Select File Types" />
+                  <SelectValue placeholder={t("selectFileTypes")} />
                 </SelectTrigger>
                 <SelectContent>
                   {["photo", "video", "audio", "file"].map((type) => (
                     <SelectItem key={type} value={type}>
-                      {type}
+                      {isFileTypeKey(type) ? tType(type) : type}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -298,7 +298,7 @@ function DownloadRule({ value, onChange }: DownloadRuleProps) {
                     className="flex items-center gap-1 px-2 py-1"
                     variant="secondary"
                   >
-                    {type}
+                    {isFileTypeKey(type) ? tType(type) : type}
                     <X
                       className="h-3 w-3 cursor-pointer"
                       onClick={() => removeFileType(type)}
@@ -310,7 +310,7 @@ function DownloadRule({ value, onChange }: DownloadRuleProps) {
 
             <div className="rounded-md border p-4">
               <div className="flex items-center justify-between">
-                <Label htmlFor="download-history">Download History</Label>
+                <Label htmlFor="download-history">{t("downloadHistory")}</Label>
                 <Switch
                   id="download-history"
                   checked={value.downloadHistory}
@@ -323,14 +323,13 @@ function DownloadRule({ value, onChange }: DownloadRuleProps) {
                 />
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                If enabled, all historical files will be downloaded. Otherwise,
-                only new files will be downloaded.
+                {t("downloadHistoryHint")}
               </p>
             </div>
             <div className="rounded-md border p-4">
               <div className="flex items-center justify-between">
                 <Label htmlFor="download-comment-files">
-                  Download comment files
+                  {t("downloadCommentFiles")}
                 </Label>
                 <Switch
                   id="download-comment-files"
@@ -357,6 +356,7 @@ interface TransferRuleProps {
 }
 
 function TransferRule({ value, onChange }: TransferRuleProps) {
+  const t = useTranslations("automation");
   const captionNameId = useId();
   const handleTransferRuleChange = (changes: Partial<AutoTransferRule>) => {
     onChange({
@@ -369,19 +369,19 @@ function TransferRule({ value, onChange }: TransferRuleProps) {
     <Accordion type="single" collapsible>
       <AccordionItem value="advanced">
         <AccordionTrigger className="hover:no-underline">
-          Advanced
+          {t("advanced")}
         </AccordionTrigger>
         <AccordionContent>
           <div className="flex flex-col space-y-4 rounded-md border p-4 shadow">
             <div className="flex flex-col space-y-2">
               <Label htmlFor="destination">
-                Destination folder for auto transfer
+                {t("destinationLabel")}
               </Label>
               <Input
                 id="destination"
                 type="text"
                 className="w-full"
-                placeholder="Enter a destination folder"
+                placeholder={t("destinationPlaceholder")}
                 value={value.destination}
                 onChange={(e) => {
                   handleTransferRuleChange({ destination: e.target.value });
@@ -390,7 +390,7 @@ function TransferRule({ value, onChange }: TransferRuleProps) {
             </div>
 
             <div className="flex flex-col space-y-2">
-              <Label htmlFor="transfer-policy">Transfer Policy</Label>
+              <Label htmlFor="transfer-policy">{t("transferPolicy")}</Label>
               <PolicySelect
                 policyType="transfer"
                 value={value.transferPolicy}
@@ -405,13 +405,13 @@ function TransferRule({ value, onChange }: TransferRuleProps) {
             {value.transferPolicy === "GROUP_BY_AI" && (
               <div className="flex flex-col space-y-2">
                 <Label htmlFor="prompt-template">
-                  AI Classification Prompt Template
+                  {t("prompt")}
                 </Label>
                 <Textarea
                   id="prompt-template"
                   className="w-full"
                   rows={4}
-                  placeholder="Enter a prompt template to guide AI classification"
+                  placeholder={t("promptPlaceholder")}
                   value={value.extra.promptTemplate || ""}
                   onChange={(e) =>
                     handleTransferRuleChange({
@@ -426,7 +426,7 @@ function TransferRule({ value, onChange }: TransferRuleProps) {
             )}
 
             <div className="flex flex-col space-y-2">
-              <Label htmlFor="duplication-policy">Duplication Policy</Label>
+              <Label htmlFor="duplication-policy">{t("duplicationPolicy")}</Label>
               <PolicySelect
                 policyType="duplication"
                 value={value.duplicationPolicy}
@@ -440,7 +440,7 @@ function TransferRule({ value, onChange }: TransferRuleProps) {
 
             <div className="rounded-md border p-4">
               <div className="flex items-center justify-between">
-                <Label htmlFor="transfer-history">Transfer History</Label>
+                <Label htmlFor="transfer-history">{t("transferHistory")}</Label>
                 <Switch
                   id="transfer-history"
                   checked={value.transferHistory}
@@ -450,14 +450,13 @@ function TransferRule({ value, onChange }: TransferRuleProps) {
                 />
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                Transfer files that are already downloaded to the specified
-                location.
+                {t("transferHistoryHint")}
               </p>
             </div>
 
             <div className="rounded-md border p-4">
               <div className="flex items-center justify-between">
-                <Label htmlFor={captionNameId}>Add caption to file name</Label>
+                <Label htmlFor={captionNameId}>{t("captionName")}</Label>
                 <Switch
                   id={captionNameId}
                   checked={value.useCaptionName ?? false}
@@ -467,9 +466,7 @@ function TransferRule({ value, onChange }: TransferRuleProps) {
                 />
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                Append the post caption to the transferred file name (e.g.
-                name_caption.jpg). Falls back to the original name when the post
-                has no caption.
+                {t("captionNameHint")}
               </p>
             </div>
           </div>
@@ -479,91 +476,109 @@ function TransferRule({ value, onChange }: TransferRuleProps) {
   );
 }
 
-const PolicyLegends: Record<
-  TransferPolicy | DuplicationPolicy,
-  {
-    title: string;
-    description: string | React.ReactNode;
+type PolicyKey = TransferPolicy | DuplicationPolicy;
+
+function policyTitle(
+  t: ReturnType<typeof useTranslations<"automation">>,
+  policy: string,
+) {
+  switch (policy) {
+    case "DIRECT":
+      return t("policies.DIRECT.title");
+    case "GROUP_BY_CHAT":
+      return t("policies.GROUP_BY_CHAT.title");
+    case "GROUP_BY_TYPE":
+      return t("policies.GROUP_BY_TYPE.title");
+    case "GROUP_BY_AI":
+      return t("policies.GROUP_BY_AI.title");
+    case "OVERWRITE":
+      return t("policies.OVERWRITE.title");
+    case "SKIP":
+      return t("policies.SKIP.title");
+    case "RENAME":
+      return t("policies.RENAME.title");
+    case "HASH":
+      return t("policies.HASH.title");
+    default:
+      return policy;
   }
-> = {
-  DIRECT: {
-    title: "Direct",
-    description: "Transfer files directly to the destination folder.",
-  },
-  GROUP_BY_CHAT: {
-    title: "Group by Chat",
-    description: (
+}
+
+function PolicyDescription({ policy }: { policy: PolicyKey }) {
+  const t = useTranslations("automation");
+  const example = (
+    <p className="text-xs text-muted-foreground">{t("example")}</p>
+  );
+  const sample = (text: string) => (
+    <p className="inline-block rounded bg-gray-100 p-1 text-xs text-muted-foreground dark:bg-gray-800 dark:text-gray-300">
+      {text}
+    </p>
+  );
+
+  if (policy === "GROUP_BY_CHAT") {
+    return (
       <div className="space-y-2">
-        <p className="text-sm">
-          Transfer files to folders based on the chat name.
-        </p>
-        <p className="text-xs text-muted-foreground">Example:</p>
-        <p className="inline-block rounded bg-gray-100 p-1 text-xs text-muted-foreground dark:bg-gray-800 dark:text-gray-300">
-          {"/${Destination Folder}/${Telegram Id}/${Chat Id}/${file}"}
-        </p>
+        <p className="text-sm">{t("policies.GROUP_BY_CHAT.description")}</p>
+        {example}
+        {sample(t("policies.GROUP_BY_CHAT.path"))}
       </div>
-    ),
-  },
-  GROUP_BY_TYPE: {
-    title: "Group by Type",
-    description: (
+    );
+  }
+  if (policy === "GROUP_BY_TYPE") {
+    return (
       <div className="space-y-2">
-        <p className="text-sm">
-          Transfer files to folders based on the file type. <br />
-          All account files will be transferred to the same folder.
-        </p>
-        <p className="text-xs text-muted-foreground">Example:</p>
-        <p className="inline-block rounded bg-gray-100 p-1 text-xs text-muted-foreground dark:bg-gray-800 dark:text-gray-300">
-          {"/${Destination Folder}/${File Type}/${file}"}
-        </p>
+        <p className="text-sm">{t("policies.GROUP_BY_TYPE.description")}</p>
+        {example}
+        {sample(t("policies.GROUP_BY_TYPE.path"))}
       </div>
-    ),
-  },
-  GROUP_BY_AI: {
-    title: "Group by AI",
-    description: (
+    );
+  }
+  if (policy === "GROUP_BY_AI") {
+    return (
       <div className="space-y-2">
-        <p className="text-sm">
-          Use AI to classify files and transfer them to different folders based
-          on their content.
+        <p className="text-sm">{t("policies.GROUP_BY_AI.description")}</p>
+        <p className="text-sm">{t("policies.GROUP_BY_AI.promptHint")}</p>
+        <p className="inline-block whitespace-pre-line rounded bg-gray-100 p-1 text-xs text-muted-foreground dark:bg-gray-800 dark:text-gray-300">
+          {t("aiExample")}
         </p>
-        <p className="text-sm">
-          You can write a prompt to guide the AI in classifying the files. Like:
-        </p>
-        <p className="inline-block rounded bg-gray-100 p-1 text-xs text-muted-foreground dark:bg-gray-800 dark:text-gray-300">
-          Classify the following file into one of the categories: Work,
-          Personal, Important, Others. <br />
-          File name: {"{file_name}"} <br />
-          Respond with only the category name.
-        </p>
-        <p className="text-sm">
-          You can use {"{FileRecord Field}"} in the prompt to provide more
-          context to the AI.
-        </p>
+        <p className="text-sm">{t("aiFieldHint")}</p>
       </div>
-    ),
-  },
-  OVERWRITE: {
-    title: "Overwrite",
-    description:
-      "If destination exists same name file, move and overwrite the file.",
-  },
-  SKIP: {
-    title: "Skip",
-    description:
-      "If destination exists same name file, skip the file, nothing to do.",
-  },
-  RENAME: {
-    title: "Rename",
-    description:
-      "This strategy will rename the file, add a serial number after the file name, and then move the file to the destination folder",
-  },
-  HASH: {
-    title: "Hash",
-    description:
-      "Calculate the hash (md5) of the file and compare with the existing file, if the hash is the same, delete the original file and set the local path to the existing file, otherwise, move the file",
-  },
-};
+    );
+  }
+  if (policy === "DIRECT") {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {t("policies.DIRECT.description")}
+      </p>
+    );
+  }
+  if (policy === "OVERWRITE") {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {t("policies.OVERWRITE.description")}
+      </p>
+    );
+  }
+  if (policy === "SKIP") {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {t("policies.SKIP.description")}
+      </p>
+    );
+  }
+  if (policy === "RENAME") {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {t("policies.RENAME.description")}
+      </p>
+    );
+  }
+  return (
+    <p className="text-sm text-muted-foreground">
+      {t("policies.HASH.description")}
+    </p>
+  );
+}
 
 interface PolicySelectProps {
   policyType: "transfer" | "duplication";
@@ -572,14 +587,11 @@ interface PolicySelectProps {
 }
 
 function PolicySelect({ policyType, value, onChange }: PolicySelectProps) {
+  const t = useTranslations("automation");
   const [open, setOpen] = useState(false);
   const polices =
     policyType === "transfer" ? TransferPolices : DuplicationPolicies;
   const [peekedPolicy, setPeekedPolicy] = useState<string>(value ?? polices[0]);
-
-  const peekPolicyLegend = useMemo(() => {
-    return PolicyLegends[peekedPolicy as TransferPolicy | DuplicationPolicy];
-  }, [peekedPolicy]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -588,10 +600,10 @@ function PolicySelect({ policyType, value, onChange }: PolicySelectProps) {
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          aria-label="Select a policy"
+          aria-label={t("selectPolicy")}
           className="w-full justify-between"
         >
-          {value ?? "Select a policy..."}
+          {value ? policyTitle(t, value) : t("selectPolicyPlaceholder")}
           <ChevronsUpDown className="opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -605,15 +617,9 @@ function PolicySelect({ policyType, value, onChange }: PolicySelectProps) {
           >
             <div className="grid gap-2">
               <h4 className="font-medium leading-none">
-                {peekPolicyLegend?.title}
+                {policyTitle(t, peekedPolicy)}
               </h4>
-              {typeof peekPolicyLegend?.description === "string" ? (
-                <p className="text-sm text-muted-foreground">
-                  {peekPolicyLegend?.description ?? ""}
-                </p>
-              ) : (
-                peekPolicyLegend?.description
-              )}
+              <PolicyDescription policy={peekedPolicy as PolicyKey} />
             </div>
           </HoverCardContent>
           <Command>
@@ -649,6 +655,7 @@ interface PolicyItemProps {
 }
 
 function PolicyItem({ policy, isSelected, onSelect, onPeek }: PolicyItemProps) {
+  const t = useTranslations("automation");
   const ref = React.useRef<HTMLDivElement>(null);
 
   useMutationObserver(ref, (mutations) => {
@@ -670,7 +677,7 @@ function PolicyItem({ policy, isSelected, onSelect, onPeek }: PolicyItemProps) {
       ref={ref}
       className="data-[selected=true]:bg-primary data-[selected=true]:text-primary-foreground"
     >
-      {policy}
+      {policyTitle(t, policy)}
       <Check
         className={cn("ml-auto", isSelected ? "opacity-100" : "opacity-0")}
       />
